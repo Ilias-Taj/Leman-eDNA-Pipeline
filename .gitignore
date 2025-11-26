@@ -1,0 +1,26 @@
+# Project .gitignore - files and folders that should not be checked into git
+
+# Local conda env (recreate from environment.yml)
+/env/
+
+# Pipeline outputs and temporary results
+/out/
+
+# Raw input reads (do not commit large raw data)
+raw_reads/
+
+# Reference DB (may be large or built from data)
+refs/
+
+# Archived third-party or copied scripts
+/archive/
+
+# macOS metadata
+.DS_Store
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Editor/IDE
+.vscode/

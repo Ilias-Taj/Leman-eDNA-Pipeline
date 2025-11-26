@@ -1,0 +1,26 @@
+# environment.yml
+# Defines the conda environment for the eDNA pipeline.
+#
+# To create the environment (in a new './env' folder):
+#   mamba env create -f environment.yml -p ./env
+#
+# Or if you don't have mamba:
+#   conda env create -f environment.yml -p ./env
+#
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # --- Conda Packages ---
+  - python=3.10
+  - mamba       # Good to have in the env itself
+  - pip
+  - cutadapt    # Replaces porechop. Trims adapters AND primers.
+  - filtlong    # Replaces nanofilt. Smarter quality filtering.
+  - minimap2
+  - kraken2
+  - samtools
+  # --- Pip Packages ---
+  - pip: 
+      - dorado
