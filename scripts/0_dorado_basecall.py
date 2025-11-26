@@ -47,7 +47,7 @@ def build_dorado_command(pod5_input, out_fastq, model, device=None, threads=4, e
         cmd += ["-m", str(model)]
     if device:
         cmd += ["--device", str(device)]
-    # Many dorado builds accept a workers/threads option; use --workers as a common name.
+    # use --workers as a common name.
     cmd += ["--workers", str(threads)]
     cmd += [str(pod5_input)]
     cmd += ["-o", str(out_fastq)]
@@ -81,7 +81,7 @@ def main():
     # Use the pod5 directory path as dorado input (may need adjustment per install).
     pod5_input = str(pod5)
 
-    # Build the dorado command (placeholder) - adjust to local install as needed.
+    # Build the dorado command / adjust to local install as needed.
     cmd = build_dorado_command(pod5_input, outp, args.model, device=args.device, threads=args.threads)
 
     # Print debugging info and the command to be run.
@@ -95,7 +95,7 @@ def main():
         print("Basecalling command returned non-zero exit code.", file=sys.stderr)
         sys.exit(rc)
 
-    # Basic output validation: check that the output file exists and report size.
+    # Check that the output file exists and report size.
     if outp.exists():
         sz = outp.stat().st_size
         print(f"Wrote basecalled FASTQ to: {outp} (size: {sz} bytes)")

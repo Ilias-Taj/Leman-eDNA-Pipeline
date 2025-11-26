@@ -68,7 +68,27 @@ for sample in "${samples[@]}"; do
   echo
   echo "========== Processing: $sample =========="
   sample_dir="$ROOT_DIR/$sample"
-  reads="$sample_dir/assembly/raw.reads.unsorted"
+  raw_reads_path="$sample_dir/assembly/raw.reads.unsorted"
+  # If raw signal (.pod5) files exist, run Dorado basecalling (step 0) and use
+  # the produced FASTQ as the reads input. Otherwise, start from the existing
+  # raw reads file (assembly/raw.reads.unsorted).
+  pod5_dir="$sample_dir/pod5"
+  basecalled="$outdir/basecalled.fastq.gz"
+  if [ -d "$pod5_dir" ] && [ -n "$(find "$pod5_dir" -type f -name '*.pod5' -print -quit)" ]; then
+    echo "Found .pod5 files; running Dorado basecaller..." | tee -a "$logf"
+    if ! conda run -p "$ENV_PREFIX" python3 scripts/0_dorado_basecall.py --pod5_dir "$pod5_dir" --output "$basecalled" >> "$logf" 2>&1; then
+      echo "Basecalling failed for $sample (see $logf). Continuing to next sample." | tee -a "$logf"
+      continue
+    fi
+    if [ -f "$basecalled" ]; then
+      reads="$basecalled"
+    else
+      echo "Basecalled file not found for $sample; skipping sample" | tee -a "$logf"
+      continue
+    fi
+  else
+    reads="$raw_reads_path"
+  fi
   outdir="out/$sample"
   logf="out/logs/${sample}.log"
 

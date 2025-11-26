@@ -2,8 +2,8 @@
 """
 2_run_preprocessing.py
 
-A robust preprocessing pipeline for MinION eDNA metabarcoding data.
-This script is based on common literature workflows.
+Preprocessing pipeline for MinION eDNA metabarcoding data.
+This script is based on literature workflows.
 
 Steps:
  - Trim adapters/primers with cutadapt (single-end amplicon trimming)
