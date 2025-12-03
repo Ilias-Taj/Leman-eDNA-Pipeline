@@ -11,6 +11,9 @@ MIN_READS=20
 MAPQ=40
 KEEP_PERCENT=90
 MIN_LENGTH=100
+DORADO_MODEL=""
+DORADO_DEVICE=""
+DORADO_DRY_RUN=0
 
 usage(){
   cat <<EOF
@@ -40,6 +43,9 @@ while [[ $# -gt 0 ]]; do
     --mapq) MAPQ="$2"; shift 2;;
     --keep_percent) KEEP_PERCENT="$2"; shift 2;;
     --min_length) MIN_LENGTH="$2"; shift 2;;
+      --dorado_model) DORADO_MODEL="$2"; shift 2;;
+      --dorado_device) DORADO_DEVICE="$2"; shift 2;;
+      --dorado_dry_run) DORADO_DRY_RUN=1; shift 1;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -68,7 +74,14 @@ for sample in "${samples[@]}"; do
   echo
   echo "========== Processing: $sample =========="
   sample_dir="$ROOT_DIR/$sample"
+  outdir="out/$sample"
   raw_reads_path="$sample_dir/assembly/raw.reads.unsorted"
+  logf="out/logs/${sample}.log"
+
+  # create per-sample folders early so basecaller can write into outdir
+  mkdir -p "$outdir" "out/logs" "out/validation/$sample"
+  echo "Sample: $sample" > "$logf"
+
   # If raw signal (.pod5) files exist, run Dorado basecalling (step 0) and use
   # the produced FASTQ as the reads input. Otherwise, start from the existing
   # raw reads file (assembly/raw.reads.unsorted).
@@ -76,7 +89,18 @@ for sample in "${samples[@]}"; do
   basecalled="$outdir/basecalled.fastq.gz"
   if [ -d "$pod5_dir" ] && [ -n "$(find "$pod5_dir" -type f -name '*.pod5' -print -quit)" ]; then
     echo "Found .pod5 files; running Dorado basecaller..." | tee -a "$logf"
-    if ! conda run -p "$ENV_PREFIX" python3 scripts/0_dorado_basecall.py --pod5_dir "$pod5_dir" --output "$basecalled" >> "$logf" 2>&1; then
+    # Build dorado args
+    dorado_args=(--pod5_dir "$pod5_dir" --output "$basecalled")
+    if [ -n "$DORADO_MODEL" ]; then
+      dorado_args+=(--model "$DORADO_MODEL")
+    fi
+    if [ -n "$DORADO_DEVICE" ]; then
+      dorado_args+=(--device "$DORADO_DEVICE")
+    fi
+    if [ "$DORADO_DRY_RUN" -eq 1 ]; then
+      dorado_args+=(--dry_run)
+    fi
+    if ! conda run -p "$ENV_PREFIX" python3 scripts/0_dorado_basecall.py "${dorado_args[@]}" >> "$logf" 2>&1; then
       echo "Basecalling failed for $sample (see $logf). Continuing to next sample." | tee -a "$logf"
       continue
     fi
@@ -93,8 +117,6 @@ for sample in "${samples[@]}"; do
   logf="out/logs/${sample}.log"
 
   mkdir -p "$outdir" "out/logs" "out/validation/$sample"
-  echo "Sample: $sample" > "$logf"
-
   if [ ! -f "$reads" ]; then
     echo "Missing reads file: $reads" | tee -a "$logf"
     continue
@@ -158,5 +180,13 @@ for sample in "${samples[@]}"; do
 
   echo "Finished sample: $sample" | tee -a "$logf"
 done
+
+# After processing all samples, merge per-sample matrices into a single matrix
+echo "Running merge and comparison step..." | tee -a out/logs/run_full_pipeline_merge.log
+if ! conda run -p "$ENV_PREFIX" python3 scripts/4_merge_and_compare.py >> out/logs/run_full_pipeline_merge.log 2>&1; then
+  echo "Merge step failed (see out/logs/run_full_pipeline_merge.log)" >&2
+else
+  echo "Merge completed. Outputs in out/merged/" | tee -a out/logs/run_full_pipeline_merge.log
+fi
 
 echo "All done. Per-sample logs are in out/logs/"
