@@ -28,5 +28,5 @@ fi
 
 echo ""
 echo "Environment successfully created at: $ENV_PREFIX"
-echo "Tools installed: cutadapt, filtlong, minimap2, kraken2, dorado"
+echo "Tools installed: filtlong, vsearch, samtools, biopython, pandas, matplotlib, seaborn, ipykernel"
 echo "Activate it with: conda activate $ENV_PREFIX"
