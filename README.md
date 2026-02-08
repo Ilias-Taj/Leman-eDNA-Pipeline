@@ -2,6 +2,16 @@
 
 This pipeline is designed for dual-marker amplicon sequencing (specifically 18S rRNA and COI) from aquatic or terrestrial samples. It takes raw FASTQ files and produces clean and abundance-based OTU matrices ready for statistical analysis.
 
+## Next Student: What to Test First
+
+Please review the technical limitations and to-do list in [results_analysis.ipynb](results_analysis.ipynb) and focus on these immediate tests:
+
+1. **COI reference database:** Download and validate the **eKOI COI database** (see the COI Database section below) and confirm that SINTAX/BLAST assignments improve.
+2. **COI yield troubleshooting:** Investigate why >90% of COI reads are <300 bp and adjust size-selection or PCR parameters if possible.
+3. **Blocking primers:** Evaluate blocking primers to reduce ciliate amplification in COI.
+4. **Local reference library:** Begin compiling local Swiss taxa for a custom COI/18S reference to reduce mis-assignments.
+5. **Dereplication:** Implement a dereplication step before clustering to speed up processing and reduce memory usage.
+
 ## Key Features
 
 * **Marker-Aware:** Automatically separates 18S and COI reads based on amplicon length.
@@ -72,13 +82,13 @@ Before running taxonomy assignment (Step 5), you need to download and prepare re
    
    This creates a binary database (~1.1 GB) optimized for VSEARCH SINTAX.
 
-### COI Database (To be determined)
+### COI Database (eKOI)
 
-**Status:** No suitable COI reference database has been identified yet.
+The **eKOI database** is a curated COI reference option: https://academic.oup.com/database/article/doi/10.1093/database/baaf057/8263868
 
-Once a database is selected, convert it to UDB format using:
+Once downloaded, convert it to UDB format using:
 ```bash
-./env/bin/vsearch --makeudb_usearch database.fasta --output database_COI.udb
+./env/bin/vsearch --makeudb_usearch eKOI.fasta --output eKOI_COI.udb
 ```
 
 ## How to Run
