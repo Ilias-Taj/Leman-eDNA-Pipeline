@@ -112,8 +112,15 @@ def parse_sintax_output(sintax_file, marker):
     """
     Parse SINTAX output and generate summary statistics.
     
+    Uses column 3 (confident taxonomy at the specified cutoff) rather than
+    column 1 (full taxonomy at any confidence) to avoid inflating counts
+    with low-confidence guesses.
+    
     SINTAX output format (tab-separated):
-    query_id    taxonomy_string    strand    confidence_scores
+    col0: query_id
+    col1: full taxonomy with bootstrap values at ALL levels
+    col2: strand (+/-)
+    col3: taxonomy with only levels >= confidence cutoff
     """
     if not Path(sintax_file).exists():
         return None
@@ -122,6 +129,7 @@ def parse_sintax_output(sintax_file, marker):
         'total_otus': 0,
         'assigned': 0,
         'unassigned': 0,
+        'assigned_beyond_domain': 0,
         'phylum_counts': {},
         'class_counts': {},
         'order_counts': {},
@@ -139,22 +147,24 @@ def parse_sintax_output(sintax_file, marker):
             if len(parts) < 2:
                 continue
             
-            otu_id = parts[0]
-            taxonomy = parts[1] if len(parts) > 1 else ""
-            
             stats['total_otus'] += 1
             
-            if taxonomy and taxonomy != "*":
+            # Use column 3 (confident taxonomy >= cutoff) instead of column 1
+            confident_taxonomy = parts[3].strip() if len(parts) > 3 else ""
+            
+            if confident_taxonomy:
                 stats['assigned'] += 1
                 
-                # Parse taxonomy levels: d:domain,p:phylum,c:class,o:order,f:family,g:genus,s:species
+                # Parse confident taxonomy levels (format: d:Eukaryota,p:Phylum,...)
                 tax_levels = {}
-                for item in taxonomy.split(','):
+                for item in confident_taxonomy.split(','):
                     if ':' in item:
                         level, name = item.split(':', 1)
-                        # Remove confidence score from name (e.g. "Arthropoda(1.00)" -> "Arthropoda")
-                        clean_name = name.split('(')[0].strip()
-                        tax_levels[level] = clean_name
+                        tax_levels[level] = name.strip()
+                
+                # Track OTUs resolved beyond just domain
+                if any(k in tax_levels for k in ('p', 'c', 'o', 'f', 'g', 's')):
+                    stats['assigned_beyond_domain'] += 1
                 
                 # Count at each level
                 if 'p' in tax_levels:
@@ -186,12 +196,14 @@ def print_taxonomy_summary(stats, marker):
         print(f"\n[{marker}] No taxonomy results available")
         return
     
+    total = stats['total_otus']
     print(f"\n{'='*60}")
-    print(f"TAXONOMY SUMMARY: {marker}")
+    print(f"TAXONOMY SUMMARY: {marker} (confident assignments only)")
     print(f"{'='*60}")
-    print(f"Total OTUs: {stats['total_otus']}")
-    print(f"Assigned: {stats['assigned']} ({100*stats['assigned']/stats['total_otus']:.1f}%)")
-    print(f"Unassigned: {stats['unassigned']} ({100*stats['unassigned']/stats['total_otus']:.1f}%)")
+    print(f"Total OTUs: {total}")
+    print(f"Assigned (any confident level): {stats['assigned']} ({100*stats['assigned']/total:.1f}%)")
+    print(f"Resolved beyond domain: {stats.get('assigned_beyond_domain', 0)} ({100*stats.get('assigned_beyond_domain', 0)/total:.1f}%)")
+    print(f"Domain only or unassigned: {total - stats.get('assigned_beyond_domain', 0)} ({100*(total - stats.get('assigned_beyond_domain', 0))/total:.1f}%)")
     
     print(f"\nTop 10 Phyla:")
     for phylum, count in sorted(stats['phylum_counts'].items(), key=lambda x: x[1], reverse=True)[:10]:
