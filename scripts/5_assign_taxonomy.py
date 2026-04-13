@@ -240,6 +240,9 @@ Database Preparation:
                         help="Path to 18S rRNA reference database (.udb format required)")
     parser.add_argument("--db_COI", 
                         help="Path to COI reference database (.udb format required)")
+    parser.add_argument("--db_JEDI",
+                        help="Path to JEDI (COI) reference database (.udb format). "
+                             "JEDI targets COI, so the same MIDORI2/eKOI COI database works.")
     parser.add_argument("--threads", type=int, default=4, 
                         help="Number of threads for VSEARCH (default: 4)")
     parser.add_argument("--confidence", type=float, default=0.8, 
@@ -248,8 +251,8 @@ Database Preparation:
     args = parser.parse_args()
     
     # Validate that at least one database is provided
-    if not args.db_18S and not args.db_COI:
-        parser.error("At least one database (--db_18S or --db_COI) must be provided")
+    if not args.db_18S and not args.db_COI and not args.db_JEDI:
+        parser.error("At least one database (--db_18S, --db_COI, or --db_JEDI) must be provided")
     
     vsearch_path = check_vsearch()
     
@@ -271,7 +274,8 @@ Database Preparation:
     
     markers = {
         "18S": args.db_18S,
-        "COI": args.db_COI
+        "COI": args.db_COI,
+        "JEDI": args.db_JEDI,
     }
     
     print(f"{'='*60}")

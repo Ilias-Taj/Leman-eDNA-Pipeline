@@ -6,7 +6,7 @@ set -eo pipefail
 # Writes per-sample logs to out/logs/<sample>.log and produces outputs under out/<sample>/
 
 # Default to the delivered eDNA run; override with --root if needed
-ROOT_DIR="data/Water_eDNA_18S_COI_14_01_26/fastq_pass" #MODIY THIS TO CHECK OTHER DATASETS
+ROOT_DIR="data/Water_eDNA_18S_COI_14_01_26/fastq_pass" #MODIFY THIS TO CHECK OTHER DATASETS
 ENV_PREFIX="./env"
 THREADS=12
 MIN_READS=20
@@ -14,6 +14,7 @@ MAPQ=20 # MAPQ threshold for grouping reads
 KEEP_PERCENT=100
 MIN_LENGTH=0
 MIN_MEAN_Q=20
+MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
 
 # Detect system resources
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -37,6 +38,9 @@ Usage: $(basename "$0") [options]
 Options:
   --root DIR         Root folder with sample subfolders (default: "$ROOT_DIR")
   --env PREFIX       Conda env prefix to use (default: "$ENV_PREFIX")
+  --markers LIST     Comma-separated markers to search for (default: "$MARKERS")
+                     Valid markers: 18S, COI, JEDI
+                     Examples: "18S,COI" (water), "JEDI,COI" (soil), "18S,COI,JEDI" (all)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -46,7 +50,10 @@ Options:
   -h, --help         Show this help
 
 Example:
-  $(basename "$0") --env ./env --threads 4
+  # Water eDNA (18S + COI)
+  $(basename "$0") --root data/Water_eDNA_18S_COI_14_01_26/fastq_pass --markers 18S,COI
+  # Soil eDNA (JEDI + COI)
+  $(basename "$0") --root data/Soil_eDNA_JEDI_COI_14_01_26/fastq_pass --markers JEDI,COI
 EOF
 }
 
@@ -65,6 +72,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --root) ROOT_DIR="$2"; shift 2;;
     --env) ENV_PREFIX="$2"; shift 2;;
+    --markers) MARKERS="$2"; shift 2;;
     --threads) THREADS="$2"; shift 2;;
     --min_reads) MIN_READS="$2"; shift 2;;
     --mapq) MAPQ="$2"; shift 2;;
@@ -117,6 +125,7 @@ log_message ""
 log_message "PIPELINE CONFIGURATION"
 log_message "======================================="
 log_message "Threads/jobs per task: $THREADS"
+log_message "Active markers: $MARKERS"
 log_message "Quality threshold (min_mean_q): $MIN_MEAN_Q"
 log_message "Clustering method: VSEARCH (global sequence alignment)"
 log_message "Clustering identity threshold: 0.95"
@@ -255,7 +264,8 @@ update_progress "[MARKER] Starting marker classification..."
 marker_start=$(date +%s)
 marker_mem_start=$(get_memory_usage)
 if ! "$ENV_PREFIX/bin/python3" scripts/2_classify_markers.py \
-    --input_dir "$OUTPUT_ROOT" > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
+    --input_dir "$OUTPUT_ROOT" \
+    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
   echo "Marker classification failed (see $OUTPUT_ROOT/logs/marker_classification.log)" >&2
   log_message "✗ Marker classification FAILED"
   exit 1
@@ -280,7 +290,8 @@ if ! "$ENV_PREFIX/bin/python3" scripts/3_run_clustering_by_marker.py \
     --input_dir "$OUTPUT_ROOT" \
     --output_dir "$OUTPUT_ROOT" \
     --identity 0.95 \
-    --threads "$THREADS" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
+    --threads "$THREADS" \
+    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
   echo "Global clustering failed (see $OUTPUT_ROOT/logs/global_clustering.log)" >&2
   log_message "✗ Global clustering FAILED"
   exit 1
@@ -301,7 +312,8 @@ update_progress "[MATRICES] Starting abundance matrix generation..."
 matrix_start=$(date +%s)
 matrix_mem_start=$(get_memory_usage)
 if ! "$ENV_PREFIX/bin/python3" scripts/4_merge_otu_tables_by_marker.py \
-    --input_dir "$OUTPUT_ROOT" > "$OUTPUT_ROOT/logs/abundance_matrices.log" 2>&1; then
+    --input_dir "$OUTPUT_ROOT" \
+    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/abundance_matrices.log" 2>&1; then
   echo "Matrix generation failed (see $OUTPUT_ROOT/logs/abundance_matrices.log)" >&2
   log_message "✗ Matrix generation FAILED"
   exit 1
@@ -321,13 +333,33 @@ log_message "[5/7] Assigning taxonomy with VSEARCH SINTAX..."
 update_progress "[TAXONOMY] Starting taxonomy assignment..."
 taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
-if ! "$ENV_PREFIX/bin/python3" scripts/5_assign_taxonomy.py \
-    --input_dir "$OUTPUT_ROOT" \
-    --db_18S refs/silva_18s_v123.udb \
-    --threads "$THREADS" > "$OUTPUT_ROOT/logs/taxonomy_assignment.log" 2>&1; then
-  echo "Taxonomy assignment failed (see $OUTPUT_ROOT/logs/taxonomy_assignment.log)" >&2
-  log_message "✗ Taxonomy assignment FAILED"
-  exit 1
+
+# Build database arguments dynamically based on active markers
+TAXONOMY_DB_ARGS=""
+IFS=',' read -ra MARKER_ARRAY <<< "$MARKERS"
+for m in "${MARKER_ARRAY[@]}"; do
+  case "$m" in
+    18S) [ -f refs/silva_18s_v123.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S refs/silva_18s_v123.udb" ;;
+    COI) [ -f refs/midori2_COI.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/midori2_COI.udb" ;;
+    JEDI) 
+      # JEDI targets COI - use the same COI reference database (MIDORI2/eKOI)
+      [ -f refs/midori2_COI.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/midori2_COI.udb"
+      ;;
+  esac
+done
+
+if [ -z "$TAXONOMY_DB_ARGS" ]; then
+  echo "WARNING: No reference databases found for active markers ($MARKERS). Skipping taxonomy." >&2
+  log_message "⚠ No databases found, skipping taxonomy assignment"
+else
+  if ! "$ENV_PREFIX/bin/python3" scripts/5_assign_taxonomy.py \
+      --input_dir "$OUTPUT_ROOT" \
+      $TAXONOMY_DB_ARGS \
+      --threads "$THREADS" > "$OUTPUT_ROOT/logs/taxonomy_assignment.log" 2>&1; then
+    echo "Taxonomy assignment failed (see $OUTPUT_ROOT/logs/taxonomy_assignment.log)" >&2
+    log_message "✗ Taxonomy assignment FAILED"
+    exit 1
+  fi
 fi
 taxonomy_end=$(date +%s)
 taxonomy_mem_end=$(get_memory_usage)
@@ -338,43 +370,32 @@ log_message "✓ Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_mem
 update_progress "[TAXONOMY] Complete (${taxonomy_time}s)"
 echo ""
 
-# Step 6: BLAST validation (optional, top 10 OTUs per marker)
+# Step 6: BLAST validation (optional, top 10 OTUs per active marker)
 echo "[6/7] Running BLAST validation (top 10 OTUs)..."
 log_message "[6/7] Running BLAST validation (top 10 OTUs)..."
 update_progress "[BLAST] Starting BLAST validation..."
 blast_start=$(date +%s)
 blast_mem_start=$(get_memory_usage)
-echo "  BLASTing top 10 18S OTUs..."
-log_message "  BLASTing top 10 18S OTUs..."
-if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
-    --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_18S.csv" \
-    --fasta "$OUTPUT_ROOT/temp_clustering/consensus_18S_clean.fasta" \
-    --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_18S.txt" \
-    --marker 18S \
-    --top_n 10 > "$OUTPUT_ROOT/logs/blast_18S.log" 2>&1; then
-  echo "  ✓ 18S BLAST complete"
-  log_message "  ✓ 18S BLAST complete"
-else
-  echo "  ⚠ 18S BLAST failed (non-critical, continuing...)"
-  log_message "  ⚠ 18S BLAST failed (non-critical, continuing...)"
-fi
 
-if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_COI.csv" ]; then
-  echo "  BLASTing top 10 COI OTUs..."
-  log_message "  BLASTing top 10 COI OTUs..."
-  if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
-      --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_COI.csv" \
-      --fasta "$OUTPUT_ROOT/temp_clustering/consensus_COI_clean.fasta" \
-      --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_COI.txt" \
-      --marker COI \
-      --top_n 10 > "$OUTPUT_ROOT/logs/blast_COI.log" 2>&1; then
-    echo "  ✓ COI BLAST complete"
-    log_message "  ✓ COI BLAST complete"
-  else
-    echo "  ⚠ COI BLAST failed (non-critical, continuing...)"
-    log_message "  ⚠ COI BLAST failed (non-critical, continuing...)"
+IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
+for bm in "${BLAST_MARKERS[@]}"; do
+  if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
+    echo "  BLASTing top 10 ${bm} OTUs..."
+    log_message "  BLASTing top 10 ${bm} OTUs..."
+    if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
+        --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
+        --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
+        --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
+        --marker "$bm" \
+        --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
+      echo "  ✓ ${bm} BLAST complete"
+      log_message "  ✓ ${bm} BLAST complete"
+    else
+      echo "  ⚠ ${bm} BLAST failed (non-critical, continuing...)"
+      log_message "  ⚠ ${bm} BLAST failed (non-critical, continuing...)"
+    fi
   fi
-fi
+done
 blast_end=$(date +%s)
 blast_mem_end=$(get_memory_usage)
 blast_time=$((blast_end - blast_start))
@@ -392,6 +413,7 @@ summary_start=$(date +%s)
 summary_mem_start=$(get_memory_usage)
 if ! "$ENV_PREFIX/bin/python3" scripts/7_comprehensive_taxonomy_summary.py \
     --input_dir "$OUTPUT_ROOT" \
+    --markers "$MARKERS" \
     --skip_blast > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
   echo "Taxonomy summary failed (see $OUTPUT_ROOT/logs/taxonomy_summary.log)" >&2
   log_message "✗ Taxonomy summary FAILED"

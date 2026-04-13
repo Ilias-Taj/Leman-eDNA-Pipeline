@@ -26,6 +26,8 @@ from collections import defaultdict
 def main():
     parser = argparse.ArgumentParser(description="Generate abundance matrices from OTU assignments")
     parser.add_argument("--input_dir", required=True, help="Path to the run directory (e.g. out/Run_Name)")
+    parser.add_argument("--markers", default=None,
+                        help="Comma-separated list of markers (default: auto-detect from assignment file)")
     args = parser.parse_args()
     
     run_dir = Path(args.input_dir)
@@ -62,10 +64,11 @@ def main():
                 if len(parts) < 4:
                     continue
                 
-                # columns: read_name, otu_id, barcode, marker
+                # columns: read_name, otu_id, barcode, marker[, count]
                 otu_id, barcode, marker = parts[1], parts[2], parts[3]
+                count = int(parts[4]) if len(parts) >= 5 else 1
                 
-                otu_counts[marker][otu_id][barcode] += 1
+                otu_counts[marker][otu_id][barcode] += count
                 all_barcodes.add(barcode)
     except Exception as e:
         print(f"ERROR reading assignment file: {e}", file=sys.stderr)
@@ -74,9 +77,17 @@ def main():
     all_barcodes = sorted(list(all_barcodes))
     print(f"Found {len(all_barcodes)} samples: {all_barcodes}")
     
+    # Determine which markers to process
+    if args.markers:
+        markers_to_process = [m.strip().upper() for m in args.markers.split(",")]
+    else:
+        # Auto-detect from the data
+        markers_to_process = sorted(otu_counts.keys())
+    
+    print(f"Markers to process: {', '.join(markers_to_process)}")
+    
     # Generate separate matrices for each marker
-    # We iterate specifically over 18S and COI to enforce separation
-    for marker in ["18S", "COI"]:
+    for marker in markers_to_process:
         if marker not in otu_counts:
             print(f"\n[INFO] No data found for marker: {marker} (skipping)")
             continue

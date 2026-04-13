@@ -12,7 +12,7 @@ Usage:
         --input_dir out/Water_eDNA_18S_COI_14_01_26 \
         --output_dir out/Water_eDNA_18S_COI_14_01_26 \
         --identity 0.95 \
-        --threads 12
+        --threads 14
 
 Output:
     Creates temp_clustering/ folder with:
@@ -29,6 +29,22 @@ import shutil
 from pathlib import Path
 import gzip
 import os
+import time
+
+
+def timer(label):
+    """Context manager to time a block and print elapsed seconds."""
+    class Timer:
+        def __init__(self, label):
+            self.label = label
+            self.elapsed = 0
+        def __enter__(self):
+            self.start = time.time()
+            return self
+        def __exit__(self, *args):
+            self.elapsed = time.time() - self.start
+            print(f"[TIME] {self.label}: {self.elapsed:.1f}s")
+    return Timer(label)
 
 def remove_chimeras(working_dir, marker, vsearch_path):
     """
@@ -46,12 +62,9 @@ def remove_chimeras(working_dir, marker, vsearch_path):
         "--chimeras", str(chimeras_file),
         "--xsize"  # Removes abundance annotations for processing
     ]
-    
+
     print(f"Running Chimera Detection for {marker}...")
     subprocess.run(cmd, check=True)
-    
-    # IMPORTANT: You must now update your OTU table to remove these IDs
-    # or simply use the 'consensus_clean.fasta' for taxonomy assignment later.
     return consensus_clean, chimeras_file
 
 def load_chimera_ids(chimeras_fasta):
@@ -90,40 +103,34 @@ def check_vsearch():
 
 def concatenate_reads_by_marker(input_dir, marker, output_fasta):
     """
-    Find all filtered_reads_{marker}.fastq.gz, convert to FASTA, 
+    Find all filtered_reads_{marker}.fastq.gz, convert to FASTA,
     and merge into one file with barcode tags in headers.
     """
     print(f"Collecting {marker} reads from {input_dir}...")
-    
+
     total_reads = 0
     with open(output_fasta, 'w') as out_f:
-        # Sort to ensure consistent order
         for sample_dir in sorted(input_dir.iterdir()):
             if not sample_dir.is_dir() or sample_dir.name in ("logs", "validation", "merged", "temp_clustering"):
                 continue
-            
+
             fq_path = sample_dir / f"filtered_reads_{marker}.fastq.gz"
             if not fq_path.exists():
                 continue
-            
+
             barcode = sample_dir.name
-            
-            # Open gzip file and process FASTQ (4 lines per read)
+
             with gzip.open(fq_path, 'rt') as in_f:
                 lines = []
                 for line in in_f:
                     lines.append(line.rstrip('\n'))
-                    
-                    # FASTQ format: @header, sequence, +, quality
                     if len(lines) == 4:
-                        header = lines[0][1:].split()[0]  # Remove @ and get first part
+                        header = lines[0][1:].split()[0]
                         seq = lines[1]
-                        
-                        # Write as FASTA: >readname|barcode|marker
                         out_f.write(f">{header}|{barcode}|{marker}\n{seq}\n")
                         total_reads += 1
                         lines = []
-    
+
     print(f"Concatenated {total_reads} {marker} reads into {output_fasta}")
     return total_reads
 
@@ -217,47 +224,65 @@ def main():
     parser.add_argument("--output_dir", required=True, help="Output directory")
     parser.add_argument("--identity", type=float, default=0.95, help="Identity threshold")
     parser.add_argument("--threads", type=int, default=4, help="Threads for vsearch")
-    
+    parser.add_argument("--markers", default="18S,COI",
+                        help="Comma-separated list of markers to cluster (default: 18S,COI)")
+
     args = parser.parse_args()
-    
+
+    active_markers = [m.strip().upper() for m in args.markers.split(",")]
+
     vsearch_path = check_vsearch()
-    
+
     input_dir = Path(args.input_dir)
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Temp files
+
     temp_dir = out_dir / "temp_clustering"
     temp_dir.mkdir(exist_ok=True)
-    
-    # Process each marker separately
+
     all_otus = {}
-    
-    for marker in ["18S", "COI"]:
+    timings = {}
+
+    total_start = time.time()
+
+    for marker in active_markers:
         print(f"\n{'='*60}")
         print(f"PROCESSING MARKER: {marker}")
         print(f"{'='*60}")
-        
+
         merged_fasta = temp_dir / f"all_reads_{marker}.fasta"
-        
-        # 1. Merge Reads
-        num_reads = concatenate_reads_by_marker(input_dir, marker, merged_fasta)
+
+        # 1. Merge reads
+        with timer(f"{marker} - Concatenate reads") as t:
+            num_reads = concatenate_reads_by_marker(input_dir, marker, merged_fasta)
+        timings[f"{marker}_concat"] = t.elapsed
+
         if num_reads == 0:
             print(f"[SKIP] No {marker} reads found")
             continue
-        
+
         # 2. Run VSEARCH
-        uc_file = run_vsearch_clustering(merged_fasta, temp_dir, marker, args.identity, args.threads, vsearch_path)
+        with timer(f"{marker} - VSEARCH clustering") as t:
+            uc_file = run_vsearch_clustering(
+                merged_fasta, temp_dir, marker, args.identity, args.threads, vsearch_path
+            )
+        timings[f"{marker}_clustering"] = t.elapsed
 
         # 3. Chimera detection on centroids
-        _, chimeras_file = remove_chimeras(temp_dir, marker, vsearch_path)
-        chimera_ids = load_chimera_ids(chimeras_file)
-        
+        with timer(f"{marker} - Chimera detection") as t:
+            _, chimeras_file = remove_chimeras(temp_dir, marker, vsearch_path)
+            chimera_ids = load_chimera_ids(chimeras_file)
+        timings[f"{marker}_chimera"] = t.elapsed
+
         # 4. Parse Output (skip chimeric OTUs)
         final_assignment = out_dir / f"global_otu_assignment_{marker}.txt"
-        num_otus = parse_uc_to_assignment(uc_file, final_assignment, marker, chimera_ids=chimera_ids)
+        with timer(f"{marker} - Parse assignments") as t:
+            num_otus = parse_uc_to_assignment(
+                uc_file, final_assignment, marker, chimera_ids=chimera_ids
+            )
+        timings[f"{marker}_parse"] = t.elapsed
+
         all_otus[marker] = num_otus
-        
         print(f"✓ {marker} OTU assignment file: {final_assignment}")
     
     # Merge all marker assignments into one file
@@ -267,20 +292,25 @@ def main():
     
     merged_assignment = out_dir / "global_otu_assignment.txt"
     with open(merged_assignment, 'w') as out_f:
-        # Header
         out_f.write("read_name\totu_id\tbarcode\tmarker\n")
-        
-        # Append each marker's assignments
-        for marker in ["18S", "COI"]:
+        for marker in active_markers:
             assignment_file = out_dir / f"global_otu_assignment_{marker}.txt"
             if assignment_file.exists():
                 with open(assignment_file, 'r') as in_f:
                     for line in in_f:
                         out_f.write(line)
-    
-    # Print summary
-    print(f"\nPipeline Finished!")
-    print(f"18S OTUs: {all_otus.get('18S', 0)}")
+
+    total_elapsed = time.time() - total_start
+
+    # Print timing summary
+    print(f"\n{'='*60}")
+    print("TIMING SUMMARY")
+    print(f"{'='*60}")
+    for key, elapsed in timings.items():
+        print(f"  {key:30s} {elapsed:8.1f}s")
+    print(f"  {'TOTAL':30s} {total_elapsed:8.1f}s")
+
+    print(f"\n18S OTUs: {all_otus.get('18S', 0)}")
     print(f"COI OTUs: {all_otus.get('COI', 0)}")
     print(f"Total OTUs: {sum(all_otus.values())}")
     print(f"Global assignment file (with markers): {merged_assignment}")

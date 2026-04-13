@@ -39,7 +39,7 @@ def load_otu_to_centroid_mapping(otu_assignment_file):
     
     with open(otu_assignment_file, 'r') as f:
         for line in f:
-            if line.strip():
+            if line.strip() and not line.startswith('read_name'):
                 parts = line.strip().split('\t')
                 if len(parts) >= 2:
                     centroid_id = parts[0]
@@ -49,8 +49,27 @@ def load_otu_to_centroid_mapping(otu_assignment_file):
     
     return otu_to_centroid
 
+def clean_taxon_name(taxon):
+    """
+    Clean MIDORI2/SILVA taxon names:
+    1. Strip rank prefixes (e.g., "order_Vannellidae_95227" -> "Vannellidae_95227")
+    2. Strip trailing NCBI taxon IDs (e.g., "Arthropoda_6656" -> "Arthropoda")
+    3. Strip trailing underscores (e.g., "Metazoa_" -> "Metazoa")
+    """
+    if not taxon:
+        return taxon
+    # Strip rank prefixes
+    taxon = re.sub(r'^(kingdom|phylum|class|order|family|genus|species)_', '', taxon, flags=re.IGNORECASE)
+    # Strip trailing NCBI taxon IDs (digits after last underscore)
+    parts = taxon.rsplit('_', 1)
+    if len(parts) == 2 and parts[1].isdigit():
+        taxon = parts[0]
+    # Strip trailing underscores
+    taxon = taxon.rstrip('_')
+    return taxon
+
 def parse_silva_taxonomy(taxonomy_file):
-    """Parse SILVA taxonomy assignments."""
+    """Parse SILVA/MIDORI2 taxonomy assignments from SINTAX output."""
     taxonomy_dict = {}
     
     with open(taxonomy_file, 'r') as f:
@@ -62,13 +81,17 @@ def parse_silva_taxonomy(taxonomy_file):
             if len(parts) < 2:
                 continue
             
-            # Extract OTU ID from centroid header
-            header = parts[0]
+            # Extract centroid ID from header
+            # Handles both formats:
+            #   centroid=UUID|barcode|marker  (old VSEARCH --consout)
+            #   UUID|barcode|marker           (current pipeline)
+            header = parts[0].split(';')[0]  # strip ;size= if present
             match = re.search(r'centroid=([a-f0-9\-]+)', header)
-            if not match:
-                continue
-            
-            centroid_id = match.group(1)
+            if match:
+                centroid_id = match.group(1)
+            else:
+                # Use first field (UUID) from pipe-delimited header
+                centroid_id = header.split('|')[0].strip()
             full_taxonomy = parts[1] if len(parts) > 1 else ""
             
             # Parse taxonomy levels
@@ -78,6 +101,7 @@ def parse_silva_taxonomy(taxonomy_file):
             for match in re.finditer(r'([dkpcofgs]):([^,()]+)', full_taxonomy):
                 level_code = match.group(1)
                 taxon = match.group(2).strip()
+                taxon = clean_taxon_name(taxon)
                 
                 level_map = {'d': 'domain', 'k': 'kingdom', 'p': 'phylum', 
                            'c': 'class', 'o': 'order', 'f': 'family', 
@@ -85,6 +109,11 @@ def parse_silva_taxonomy(taxonomy_file):
                 
                 if level_code in level_map:
                     tax_dict[level_map[level_code]] = taxon
+            
+            # MIDORI2 (COI) uses k: (kingdom) instead of d: (domain).
+            # Fall back to kingdom when domain is empty.
+            if not tax_dict.get('domain') and tax_dict.get('kingdom'):
+                tax_dict['domain'] = tax_dict['kingdom']
             
             taxonomy_dict[centroid_id] = tax_dict
     
@@ -144,17 +173,33 @@ def main():
     parser.add_argument("--input_dir", required=True, help="Input directory")
     parser.add_argument("--blast_n", type=int, default=0, help="Number of top OTUs to BLAST per marker (0=skip)")
     parser.add_argument("--skip_blast", action='store_true', help="Skip BLAST, use only local taxonomy")
+    parser.add_argument("--markers", default=None,
+                        help="Comma-separated list of markers (default: auto-detect from merged/ files)")
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
     output_dir = input_dir / "taxonomy_summary"
     output_dir.mkdir(exist_ok=True)
     
+    # Determine markers to process
+    if args.markers:
+        markers_to_process = [m.strip().upper() for m in args.markers.split(",")]
+    else:
+        # Auto-detect from existing abundance files
+        merged_dir = input_dir / "merged"
+        markers_to_process = []
+        for candidate in ["18S", "COI", "JEDI"]:
+            if (merged_dir / f"otu_relative_abundance_{candidate}.csv").exists():
+                markers_to_process.append(candidate)
+        if not markers_to_process:
+            markers_to_process = ["18S", "COI"]
+    
     print("=" * 80)
     print("COMPREHENSIVE TAXONOMY SUMMARY")
+    print(f"Markers: {', '.join(markers_to_process)}")
     print("=" * 80)
     
-    for marker in ['18S', 'COI']:
+    for marker in markers_to_process:
         print(f"\n{'=' * 80}")
         print(f"PROCESSING {marker}")
         print(f"{'=' * 80}")
@@ -163,7 +208,7 @@ def main():
         abundance_file = input_dir / f"merged/otu_relative_abundance_{marker}.csv"
         taxonomy_file = input_dir / f"taxonomy/taxonomy_{marker}.txt"
         consensus_file = input_dir / f"temp_clustering/consensus_{marker}_clean.fasta"
-        otu_assignment_file = input_dir / f"global_otu_assignment{'_' + marker if marker == 'COI' else ''}.txt"
+        otu_assignment_file = input_dir / f"global_otu_assignment_{marker}.txt"
         
         # Check files exist
         if not abundance_file.exists():
@@ -203,14 +248,14 @@ def main():
             sequences = {}
             with open(consensus_file, 'r') as f:
                 for record in SeqIO.parse(f, 'fasta'):
-                    header_parts = record.id.split('|')
-                    if len(header_parts) > 0:
-                        centroid_id = header_parts[0].replace('centroid=', '')
-                        
-                        for otu_id in top_otus:
-                            if otu_id in otu_to_centroid and otu_to_centroid[otu_id] == centroid_id:
-                                sequences[otu_id] = str(record.seq)
-                                break
+                    # Strip ;size= and centroid= prefixes, then take UUID
+                    raw_id = record.id.split(';')[0]
+                    centroid_id = raw_id.split('|')[0].replace('centroid=', '')
+                    
+                    for otu_id in top_otus:
+                        if otu_id in otu_to_centroid and otu_to_centroid[otu_id] == centroid_id:
+                            sequences[otu_id] = str(record.seq)
+                            break
             
             print(f"  Loaded {len(sequences)} sequences")
             blast_results = run_blast_batch(sequences, top_otus)

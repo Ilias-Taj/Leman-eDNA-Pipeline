@@ -1,20 +1,30 @@
 # eDNA Metabarcoding Pipeline for MinION
 
-This pipeline is designed for dual-marker amplicon sequencing (specifically 18S rRNA and COI) from aquatic or terrestrial samples. It takes raw FASTQ files and produces clean and abundance-based OTU matrices ready for statistical analysis.
+This pipeline is designed for multi-marker amplicon sequencing (18S rRNA, COI, and JEDI) from aquatic or terrestrial eDNA samples. It takes raw FASTQ files and produces clean and abundance-based OTU matrices ready for statistical analysis.
+
+## Supported Markers
+
+| Marker | Target Gene | Amplicon Size | Typical Use | Reference Database |
+|--------|------------|---------------|-------------|-------------------|
+| **18S** | 18S rRNA | 1,500–2,800 bp | Water eDNA (eukaryotes) | SILVA v123 |
+| **COI** | Cytochrome Oxidase I | 500–900 bp | Water/Soil (invertebrates, Folmer primers) | MIDORI2 / eKOI |
+| **JEDI** | COI (short) | 250–500 bp | Soil eDNA (arthropods, JEDI primers ~460 bp) | MIDORI2 / eKOI (same COI db) |
 
 ## Next Student: What to Test First
 
 Please review the technical limitations and to-do list in [results_analysis.ipynb](results_analysis.ipynb) and focus on these immediate tests:
 
 1. **COI reference database:** Download and validate the **eKOI COI database** (see the COI Database section below) and confirm that SINTAX/BLAST assignments improve.
-2. **COI yield troubleshooting:** Investigate why >90% of COI reads are <300 bp and adjust size-selection or PCR parameters if possible.
-3. **Blocking primers:** Evaluate blocking primers to reduce ciliate amplification in COI.
-4. **Local reference library:** Begin compiling local Swiss taxa for a custom COI/18S reference to reduce mis-assignments.
-5. **Dereplication:** Implement a dereplication step before clustering to speed up processing and reduce memory usage.
+2. **Test Soil JEDI data:** Run the pipeline on the Soil dataset using `--markers JEDI,COI`. JEDI uses the same MIDORI2/eKOI database since it also targets COI.
+3. **COI yield troubleshooting:** The previous >90% COI reads <300 bp issue may have been JEDI amplicons being misclassified. Verify with the new JEDI size range (250-500 bp).
+4. **Blocking primers:** Evaluate blocking primers to reduce ciliate amplification in COI.
+5. **Local reference library:** Begin compiling local Swiss taxa for a custom COI/18S reference to reduce mis-assignments.
+6. **Dereplication:** Implement a dereplication step before clustering to speed up processing and reduce memory usage.
+7. **Primer-based classification:** For datasets where JEDI and COI size ranges overlap, implement primer sequence detection as an alternative to length-based classification.
 
 ## Key Features
 
-* **Marker-Aware:** Automatically separates 18S and COI reads based on amplicon length.
+* **Marker-Aware:** Automatically separates 18S, COI, and JEDI reads based on amplicon length. Use `--markers` to select which markers to search for.
 * **Noise Reduction:** Uses `filtlong` for quality filtering and VSEARCH for chimera removal.
 * **High Accuracy:** Generates Consensus Sequences for OTUs to correct Nanopore sequencing errors.
 * **Biologically Valid:** Filters out PCR artifacts (chimeras) and genomic concatemers.
@@ -27,7 +37,8 @@ Please review the technical limitations and to-do list in [results_analysis.ipyn
 ### Pipeline Steps
 
 1. **Quality Filtering** (`1_run_preprocessing.py`) - Filter reads using `filtlong` (Q>20).
-2. **Marker Classification** (`2_classify_markers.py`) - Separate 18S (1500-2800bp) and COI (300-1000bp) reads.
+2. **Marker Classification** (`2_classify_markers.py`) - Separate reads by marker using `--markers` flag:
+   - 18S: 1500–2800 bp | COI: 500–900 bp | JEDI: 250–500 bp
 3. **Clustering + Chimera Detection** (`3_run_clustering_by_marker.py`) - VSEARCH clustering (95% identity) and consensus generation.
 4. **Abundance Matrix Generation** (`4_merge_otu_tables_by_marker.py`) - Create OTU count tables.
 5. **Taxonomy Assignment** (`5_assign_taxonomy.py`) - SINTAX classification against SILVA (18S) or MIDORI (COI).
@@ -82,13 +93,24 @@ Before running taxonomy assignment (Step 5), you need to download and prepare re
    
    This creates a binary database (~1.1 GB) optimized for VSEARCH SINTAX.
 
-### COI Database (eKOI)
+### COI Database (eKOI / MIDORI2)
 
 The **eKOI database** is a curated COI reference option: https://academic.oup.com/database/article/doi/10.1093/database/baaf057/8263868
 
 Once downloaded, convert it to UDB format using:
 ```bash
 ./env/bin/vsearch --makeudb_usearch eKOI.fasta --output eKOI_COI.udb
+```
+
+### JEDI Database
+
+**JEDI primers target COI** (shorter amplicon ~460 bp), so the same COI reference database works. No separate database is needed — point `--db_JEDI` to your MIDORI2 or eKOI COI database:
+```bash
+# Example: use MIDORI2 for both COI and JEDI
+python3 scripts/5_assign_taxonomy.py \
+    --input_dir out/run_name \
+    --db_COI refs/midori2_COI.udb \
+    --db_JEDI refs/midori2_COI.udb
 ```
 
 ## How to Run
@@ -102,14 +124,22 @@ The recommended way to run the full pipeline is in the background. This ensures 
 conda activate ./env
 
 # 2. Run the orchestration script
-# Replace --root with the path to your raw 'fastq_pass' folder
+# Water eDNA (18S + COI markers)
 nohup bash scripts/run_full_pipeline.sh \
     --root data/Water_eDNA_18S_COI_14_01_26/fastq_pass \
-    --threads 12 \
-    > pipeline_run.log 2>&1 &
+    --markers 18S,COI \
+    --threads 14 \
+    > pipeline_water.log 2>&1 &
+
+# Soil eDNA (JEDI + COI markers)
+nohup bash scripts/run_full_pipeline.sh \
+    --root data/Soil_eDNA_JEDI_COI_14_01_26/fastq_pass \
+    --markers JEDI,COI \
+    --threads 14 \
+    > pipeline_soil.log 2>&1 &
 
 # 3. Monitor progress
-tail -f pipeline_run.log
+tail -f pipeline_water.log
 ```
 
 **Example Output:** See [logs_example/pipeline_20260128_124748.log](logs_example/pipeline_20260128_124748.log) for a complete pipeline execution log showing all steps, timing, and resource usage.
@@ -125,22 +155,33 @@ python3 scripts/1_run_preprocessing.py \
     --input_files data/sample_01/*.fastq.gz \
     --output_dir out/sample_01
 
-# Step 2: Separate 18S and COI
-python3 scripts/2_classify_markers.py --input_dir "out/run_name"
+# Step 2: Separate markers (choose your marker set)
+python3 scripts/2_classify_markers.py --input_dir "out/run_name" --markers 18S,COI
+# For soil data:
+python3 scripts/2_classify_markers.py --input_dir "out/run_name" --markers JEDI,COI
 
 # Step 3: Cluster and Remove Chimeras
 python3 scripts/3_run_clustering_by_marker.py \
     --input_dir "out/run_name" \
     --output_dir "out/run_name" \
+    --markers JEDI,COI \
     --threads 12
 
 # Step 4: Create Abundance Matrices
 python3 scripts/4_merge_otu_tables_by_marker.py --input_dir "out/run_name"
 
-# Step 5: Assign Taxonomy (Example for 18S)
+# Step 5: Assign Taxonomy (databases matched to markers)
+# For water (18S + COI):
 python3 scripts/5_assign_taxonomy.py \
     --input_dir "out/run_name" \
     --db_18S refs/silva_18s_v123.udb \
+    --db_COI refs/midori2_COI.udb \
+    --threads 12
+# For soil (JEDI + COI) — JEDI uses the same COI database:
+python3 scripts/5_assign_taxonomy.py \
+    --input_dir "out/run_name" \
+    --db_JEDI refs/midori2_COI.udb \
+    --db_COI refs/midori2_COI.udb \
     --threads 12
 
 # Step 7: Generate Final Report
@@ -189,7 +230,7 @@ These files are ready for direct import into R or Python for statistical analysi
 ## Methodology Summary
 
 - **Filtering:** Uses filtlong to remove reads with mean Quality Score < 20. Keeps top 100% of data (no subsampling).
-- **Classification:** Uses Python to separate markers by length (18S: 1500-2800bp, COI: 300-1000bp).
+- **Classification:** Uses Python to separate markers by length (18S: 1500-2800bp, COI: 500-900bp, JEDI: 250-500bp). Marker set is configurable via `--markers`.
 - **Clustering:** Uses vsearch to cluster reads at 95% identity. Generates Consensus Sequences to fix Nanopore errors.
 - **De-Noising:** Uses uchime_denovo to detect and remove chimeric sequences (PCR artifacts) using the consensus sequences.
 - **Quantification:** Maps reads back to valid OTUs to create abundance matrices.
