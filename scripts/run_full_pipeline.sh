@@ -340,10 +340,21 @@ IFS=',' read -ra MARKER_ARRAY <<< "$MARKERS"
 for m in "${MARKER_ARRAY[@]}"; do
   case "$m" in
     18S) [ -f refs/silva_18s_v123.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S refs/silva_18s_v123.udb" ;;
-    COI) [ -f refs/midori2_COI.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/midori2_COI.udb" ;;
+    COI)
+      # Prefer eKOI (broader eukaryote COI coverage), fall back to MIDORI2
+      if [ -f refs/eKOI_COI.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/eKOI_COI.udb"
+      elif [ -f refs/midori2_COI.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/midori2_COI.udb"
+      fi
+      ;;
     JEDI) 
-      # JEDI targets COI - use the same COI reference database (MIDORI2/eKOI)
-      [ -f refs/midori2_COI.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/midori2_COI.udb"
+      # JEDI targets COI - prefer eKOI, fall back to MIDORI2
+      if [ -f refs/eKOI_COI.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/eKOI_COI.udb"
+      elif [ -f refs/midori2_COI.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/midori2_COI.udb"
+      fi
       ;;
   esac
 done
@@ -414,6 +425,7 @@ summary_mem_start=$(get_memory_usage)
 if ! "$ENV_PREFIX/bin/python3" scripts/7_comprehensive_taxonomy_summary.py \
     --input_dir "$OUTPUT_ROOT" \
     --markers "$MARKERS" \
+    $TAXONOMY_DB_ARGS \
     --skip_blast > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
   echo "Taxonomy summary failed (see $OUTPUT_ROOT/logs/taxonomy_summary.log)" >&2
   log_message "✗ Taxonomy summary FAILED"

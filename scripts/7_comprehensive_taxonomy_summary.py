@@ -178,6 +178,25 @@ def run_blast_batch(sequences, otu_ids):
     
     return blast_results
 
+def detect_db_prefix(db_path, marker):
+    """Detect taxonomy column prefix from database filename.
+
+    Returns SILVA for 18S, and for COI/JEDI inspects the filename:
+      eKOI_COI.udb    -> 'eKOI'
+      midori2_COI.udb -> 'MIDORI2'
+    Falls back to 'eKOI' if no path provided.
+    """
+    if marker == "18S":
+        return "SILVA"
+    if db_path:
+        from pathlib import Path as P
+        name = P(db_path).stem.lower()
+        if 'midori' in name:
+            return "MIDORI2"
+        elif 'ekoi' in name:
+            return "eKOI"
+    return "eKOI"
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", required=True, help="Input directory")
@@ -187,6 +206,9 @@ def main():
                         help="Comma-separated list of markers (default: auto-detect from merged/ files)")
     parser.add_argument("--confidence", type=float, default=0.8,
                         help="SINTAX confidence threshold for taxonomy filtering (default: 0.8)")
+    parser.add_argument("--db_18S", default=None, help="Path to 18S database (for prefix detection)")
+    parser.add_argument("--db_COI", default=None, help="Path to COI database (for prefix detection)")
+    parser.add_argument("--db_JEDI", default=None, help="Path to JEDI database (for prefix detection)")
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
@@ -240,7 +262,9 @@ def main():
         print(f"  Loaded {len(otu_to_centroid)} mappings")
         
         # 3. Load taxonomy (SILVA for 18S, eKOI for COI/JEDI)
-        db_prefix = "SILVA" if marker == "18S" else "eKOI"
+        # Detect DB prefix from database path
+        db_arg = getattr(args, f'db_{marker}', None)
+        db_prefix = detect_db_prefix(db_arg, marker)
         print(f"[3/5] Loading local taxonomy assignments ({db_prefix})...")
         silva_taxonomy = {}
         if taxonomy_file.exists():
