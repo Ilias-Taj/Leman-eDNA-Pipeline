@@ -181,20 +181,26 @@ def run_blast_batch(sequences, otu_ids):
 def detect_db_prefix(db_path, marker):
     """Detect taxonomy column prefix from database filename.
 
-    Returns SILVA for 18S, and for COI/JEDI inspects the filename:
-      eKOI_COI.udb    -> 'eKOI'
-      midori2_COI.udb -> 'MIDORI2'
-    Falls back to 'eKOI' if no path provided.
+    Inspects the database filename to determine the CSV column prefix:
+      silva_18s_v123.udb -> 'SILVA'
+      eKOI_COI.udb       -> 'eKOI'
+      midori2_COI.udb    -> 'MIDORI2'
+    Falls back to 'SILVA' for 18S, 'eKOI' for COI/JEDI if no path provided.
     """
-    if marker == "18S":
-        return "SILVA"
     if db_path:
         from pathlib import Path as P
         name = P(db_path).stem.lower()
-        if 'midori' in name:
+        if 'silva' in name:
+            return "SILVA"
+        elif 'midori' in name:
             return "MIDORI2"
         elif 'ekoi' in name:
             return "eKOI"
+        elif 'pr2' in name:
+            return "PR2"
+    # Defaults when no path given
+    if marker == "18S":
+        return "SILVA"
     return "eKOI"
 
 def main():
