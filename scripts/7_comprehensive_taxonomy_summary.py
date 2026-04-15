@@ -104,7 +104,9 @@ def parse_silva_taxonomy(taxonomy_file, confidence_threshold=0.8):
                        'family': '', 'genus': '', 'species': '',
                        'domain_conf': '', 'phylum_conf': '', 'class_conf': '',
                        'order_conf': '', 'family_conf': '', 'genus_conf': '',
-                       'species_conf': ''}
+                       'species_conf': '',
+                       'genus_raw': '', 'genus_raw_conf': '',
+                       'species_raw': '', 'species_raw_conf': ''}
             
             # Parse all levels with confidence scores from col1
             for match in re.finditer(r'([dkpcofgs]):([^,(]+)\(([0-9.]+)\)', full_taxonomy):
@@ -119,6 +121,10 @@ def parse_silva_taxonomy(taxonomy_file, confidence_threshold=0.8):
                     if confidence >= confidence_threshold:
                         tax_dict[level_name] = taxon
                         tax_dict[f'{level_name}_conf'] = round(confidence, 2)
+                    # Always store raw genus/species regardless of confidence
+                    if level_name in ('genus', 'species'):
+                        tax_dict[f'{level_name}_raw'] = taxon
+                        tax_dict[f'{level_name}_raw_conf'] = round(confidence, 2)
             
             # MIDORI2 uses k: (kingdom) instead of d: (domain)
             if not tax_dict.get('domain') and tax_dict.get('kingdom'):
@@ -330,10 +336,19 @@ def main():
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = tax.get(level.lower(), '')
                     row[f'{db_prefix}_{level}_Conf'] = tax.get(f'{level.lower()}_conf', '')
+                # Raw (unfiltered) genus/species — always stored regardless of confidence
+                row[f'{db_prefix}_Genus_Raw'] = tax.get('genus_raw', '')
+                row[f'{db_prefix}_Genus_Raw_Conf'] = tax.get('genus_raw_conf', '')
+                row[f'{db_prefix}_Species_Raw'] = tax.get('species_raw', '')
+                row[f'{db_prefix}_Species_Raw_Conf'] = tax.get('species_raw_conf', '')
             else:
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = ''
                     row[f'{db_prefix}_{level}_Conf'] = ''
+                row[f'{db_prefix}_Genus_Raw'] = ''
+                row[f'{db_prefix}_Genus_Raw_Conf'] = ''
+                row[f'{db_prefix}_Species_Raw'] = ''
+                row[f'{db_prefix}_Species_Raw_Conf'] = ''
             
             # Add BLAST results if available
             if otu_id in blast_results:
