@@ -68,14 +68,12 @@ def clean_taxon_name(taxon):
     taxon = taxon.rstrip('_')
     return taxon
 
-def parse_silva_taxonomy(taxonomy_file, confidence_threshold=0.8):
-    """Parse SILVA/MIDORI2/eKOI taxonomy from SINTAX output with confidence filtering.
+def parse_silva_taxonomy(taxonomy_file):
+    """Parse SILVA/MIDORI2/eKOI taxonomy from SINTAX output.
     
-    Parses column 1 (full taxonomy with bootstrap confidences) and only
-    retains levels where confidence >= threshold. This prevents low-confidence
-    guesses (e.g., 'Craniata' at 0.13) from appearing as reliable assignments.
-    Confidence values are stored alongside taxonomy names.
-    """
+    Stores ALL taxonomy levels with their confidence values (no filtering).
+    Confidence-based filtering is done downstream in analysis notebooks,
+    allowing flexible threshold selection per plot."""
     taxonomy_dict = {}
     
     level_map = {'d': 'domain', 'k': 'kingdom', 'p': 'phylum', 
@@ -104,9 +102,7 @@ def parse_silva_taxonomy(taxonomy_file, confidence_threshold=0.8):
                        'family': '', 'genus': '', 'species': '',
                        'domain_conf': '', 'phylum_conf': '', 'class_conf': '',
                        'order_conf': '', 'family_conf': '', 'genus_conf': '',
-                       'species_conf': '',
-                       'genus_raw': '', 'genus_raw_conf': '',
-                       'species_raw': '', 'species_raw_conf': ''}
+                       'species_conf': ''}
             
             # Parse all levels with confidence scores from col1
             for match in re.finditer(r'([dkpcofgs]):([^,(]+)\(([0-9.]+)\)', full_taxonomy):
@@ -117,14 +113,8 @@ def parse_silva_taxonomy(taxonomy_file, confidence_threshold=0.8):
                 
                 if level_code in level_map:
                     level_name = level_map[level_code]
-                    # Only store taxonomy if confidence >= threshold
-                    if confidence >= confidence_threshold:
-                        tax_dict[level_name] = taxon
-                        tax_dict[f'{level_name}_conf'] = round(confidence, 2)
-                    # Always store raw genus/species regardless of confidence
-                    if level_name in ('genus', 'species'):
-                        tax_dict[f'{level_name}_raw'] = taxon
-                        tax_dict[f'{level_name}_raw_conf'] = round(confidence, 2)
+                    tax_dict[level_name] = taxon
+                    tax_dict[f'{level_name}_conf'] = round(confidence, 2)
             
             # MIDORI2 uses k: (kingdom) instead of d: (domain)
             if not tax_dict.get('domain') and tax_dict.get('kingdom'):
@@ -216,8 +206,7 @@ def main():
     parser.add_argument("--skip_blast", action='store_true', help="Skip BLAST, use only local taxonomy")
     parser.add_argument("--markers", default=None,
                         help="Comma-separated list of markers (default: auto-detect from merged/ files)")
-    parser.add_argument("--confidence", type=float, default=0.8,
-                        help="SINTAX confidence threshold for taxonomy filtering (default: 0.8)")
+    # Note: confidence filtering is now done in analysis notebooks, not here
     parser.add_argument("--db_18S", default=None, help="Path to 18S database (for prefix detection)")
     parser.add_argument("--db_COI", default=None, help="Path to COI database (for prefix detection)")
     parser.add_argument("--db_JEDI", default=None, help="Path to JEDI database (for prefix detection)")
@@ -280,8 +269,8 @@ def main():
         print(f"[3/5] Loading local taxonomy assignments ({db_prefix})...")
         silva_taxonomy = {}
         if taxonomy_file.exists():
-            silva_taxonomy = parse_silva_taxonomy(taxonomy_file, args.confidence)
-            print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (confidence >= {args.confidence})")
+            silva_taxonomy = parse_silva_taxonomy(taxonomy_file)
+            print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (all confidence levels)")
         else:
             print(f"  ⚠ Taxonomy file not found")
         
@@ -328,7 +317,7 @@ def main():
                     row[f'Sample_{sample}'] = abundance_df.loc[otu_id, sample]
             
             # Add taxonomy (SILVA for 18S, MIDORI/eKOI for COI/JEDI)
-            # Only levels with confidence >= threshold are filled
+            # All levels stored with confidence — filtering done in notebooks
             centroid_id = otu_to_centroid.get(otu_id, '')
             tax_levels = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
             if centroid_id in silva_taxonomy:
@@ -336,19 +325,12 @@ def main():
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = tax.get(level.lower(), '')
                     row[f'{db_prefix}_{level}_Conf'] = tax.get(f'{level.lower()}_conf', '')
-                # Raw (unfiltered) genus/species — always stored regardless of confidence
-                row[f'{db_prefix}_Genus_Raw'] = tax.get('genus_raw', '')
-                row[f'{db_prefix}_Genus_Raw_Conf'] = tax.get('genus_raw_conf', '')
-                row[f'{db_prefix}_Species_Raw'] = tax.get('species_raw', '')
-                row[f'{db_prefix}_Species_Raw_Conf'] = tax.get('species_raw_conf', '')
+
             else:
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = ''
                     row[f'{db_prefix}_{level}_Conf'] = ''
-                row[f'{db_prefix}_Genus_Raw'] = ''
-                row[f'{db_prefix}_Genus_Raw_Conf'] = ''
-                row[f'{db_prefix}_Species_Raw'] = ''
-                row[f'{db_prefix}_Species_Raw_Conf'] = ''
+
             
             # Add BLAST results if available
             if otu_id in blast_results:
