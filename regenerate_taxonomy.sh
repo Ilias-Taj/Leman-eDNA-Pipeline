@@ -127,6 +127,9 @@ echo "  18S  database: $DB_18S"
 echo "  COI  database: $COI_DB"
 echo "  JEDI database: $JEDI_DB"
 echo "=============================================="
+echo "  (outputs will be placed under taxonomy/<tag>/ and taxonomy_summary/<tag>/"
+echo "   where <tag> is auto-derived from the DB filenames by scripts 5 and 7)"
+echo "=============================================="
 
 # -- Water dataset (18S + COI) --
 WATER="out/Water_eDNA_18S_COI_14_01_26"

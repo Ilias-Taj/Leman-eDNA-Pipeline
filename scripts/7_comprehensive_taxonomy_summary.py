@@ -33,6 +33,9 @@ import time
 from pathlib import Path
 import re
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from db_tag import derive_tag
+
 def load_otu_to_centroid_mapping(otu_assignment_file):
     """Load mapping from OTU IDs to centroid IDs."""
     otu_to_centroid = {}
@@ -210,11 +213,31 @@ def main():
     parser.add_argument("--db_18S", default=None, help="Path to 18S database (for prefix detection)")
     parser.add_argument("--db_COI", default=None, help="Path to COI database (for prefix detection)")
     parser.add_argument("--db_JEDI", default=None, help="Path to JEDI database (for prefix detection)")
+    parser.add_argument("--tag", default=None,
+                        help="Subfolder name under taxonomy/ and taxonomy_summary/ "
+                             "(e.g. 'silva-midori2'). Auto-derived from DB filenames "
+                             "if omitted. Must match the tag used for script 5.")
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
-    output_dir = input_dir / "taxonomy_summary"
-    output_dir.mkdir(exist_ok=True)
+
+    # Derive DB tag; per-DB subfolders let multiple databases coexist.
+    tag = args.tag or derive_tag([args.db_18S, args.db_COI, args.db_JEDI])
+    # Prefer tagged taxonomy/ subfolder; fall back to flat legacy layout if absent.
+    tagged_tax_dir = input_dir / "taxonomy" / tag
+    legacy_tax_dir = input_dir / "taxonomy"
+    if tagged_tax_dir.exists():
+        taxonomy_dir_in = tagged_tax_dir
+    elif any(legacy_tax_dir.glob("taxonomy_*.txt")):
+        taxonomy_dir_in = legacy_tax_dir
+        print(f"[tag] No tagged folder found, using legacy: {legacy_tax_dir}")
+    else:
+        taxonomy_dir_in = tagged_tax_dir  # will error later with clear message
+    output_dir = input_dir / "taxonomy_summary" / tag
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[tag] DB tag: {tag}")
+    print(f"[tag] Reading taxonomy from: {taxonomy_dir_in}")
+    print(f"[tag] Writing summary to:    {output_dir}")
     
     # Determine markers to process
     if args.markers:
@@ -241,7 +264,7 @@ def main():
         
         # File paths
         abundance_file = input_dir / f"merged/otu_relative_abundance_{marker}.csv"
-        taxonomy_file = input_dir / f"taxonomy/taxonomy_{marker}.txt"
+        taxonomy_file = taxonomy_dir_in / f"taxonomy_{marker}.txt"
         consensus_file = input_dir / f"temp_clustering/consensus_{marker}_clean.fasta"
         otu_assignment_file = input_dir / f"global_otu_assignment_{marker}.txt"
         

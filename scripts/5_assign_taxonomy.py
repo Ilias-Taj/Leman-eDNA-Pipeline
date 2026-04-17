@@ -47,6 +47,9 @@ import subprocess
 import shutil
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from db_tag import derive_tag
+
 def check_vsearch():
     """Check if vsearch is installed."""
     candidates = [
@@ -280,9 +283,12 @@ Database Preparation:
         print(f"ERROR: temp_clustering directory not found: {temp_dir}", file=sys.stderr)
         sys.exit(1)
     
-    # Create taxonomy output directory
-    taxonomy_dir = input_dir / "taxonomy"
-    taxonomy_dir.mkdir(exist_ok=True)
+    # Derive DB tag and create taxonomy output subdirectory (per-DB)
+    tag = args.tag or derive_tag([args.db_18S, args.db_COI, args.db_JEDI])
+    taxonomy_dir = input_dir / "taxonomy" / tag
+    taxonomy_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[tag] DB tag: {tag}")
+    print(f"[tag] Writing taxonomy outputs to: {taxonomy_dir}")
     
     markers = {
         "18S": args.db_18S,
