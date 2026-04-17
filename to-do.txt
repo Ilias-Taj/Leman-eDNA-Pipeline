@@ -4,6 +4,8 @@ DONE:
 - JEDI uses same MIDORI2/eKOI COI database (targets same gene, shorter amplicon)
 - Test Soil Data with JEDI,COI markers.
 - Find why 90% COI are < 300 bp . : Never existed, CO1 competetion with 18S
+- Check better name than latin one.
+- Graphs of length.
 
 REMAINING:
 
