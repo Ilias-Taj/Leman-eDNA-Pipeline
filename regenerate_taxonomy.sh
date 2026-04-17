@@ -5,7 +5,9 @@ set -eo pipefail
 # for both Water and Soil datasets using the fixed confidence-filtered scripts.
 #
 # Usage:
-#   bash regenerate_taxonomy.sh                                              # auto-detect all
+#   bash regenerate_taxonomy.sh                                              # both datasets, auto-detect
+#   bash regenerate_taxonomy.sh --dataset water --db_18S silva --db_COI ekoi # water only, custom DBs
+#   bash regenerate_taxonomy.sh --dataset soil --db ekoi                     # soil only, eKOI for COI+JEDI
 #   bash regenerate_taxonomy.sh --db_18S silva --db_COI midori2 --db_JEDI eKOI
 #   bash regenerate_taxonomy.sh --db midori2                                 # set COI+JEDI
 #
@@ -25,6 +27,7 @@ export PATH="$ENV_PREFIX/bin:$PATH"
 DB_18S_CHOICE=""
 DB_COI_CHOICE=""
 DB_JEDI_CHOICE=""
+DATASET="both"  # water | soil | both
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -38,9 +41,17 @@ while [[ $# -gt 0 ]]; do
       DB_JEDI_CHOICE="$2"
       shift 2
       ;;
+    --dataset)
+      DATASET="$2"
+      case "$DATASET" in
+        water|soil|both) ;;
+        *) echo "ERROR: --dataset must be water|soil|both (got: $DATASET)" >&2; exit 1 ;;
+      esac
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
-      echo "Usage: bash regenerate_taxonomy.sh [--db_18S DB] [--db_COI DB] [--db_JEDI DB] [--db DB]" >&2
+      echo "Usage: bash regenerate_taxonomy.sh [--dataset water|soil|both] [--db_18S DB] [--db_COI DB] [--db_JEDI DB] [--db DB]" >&2
       exit 1
       ;;
   esac
@@ -127,13 +138,14 @@ echo "  18S  database: $DB_18S"
 echo "  COI  database: $COI_DB"
 echo "  JEDI database: $JEDI_DB"
 echo "=============================================="
+echo "  Dataset(s):    $DATASET"
 echo "  (outputs will be placed under taxonomy/<tag>/ and taxonomy_summary/<tag>/"
 echo "   where <tag> is auto-derived from the DB filenames by scripts 5 and 7)"
 echo "=============================================="
 
 # -- Water dataset (18S + COI) --
 WATER="out/Water_eDNA_18S_COI_14_01_26"
-if [ -d "$WATER" ]; then
+if [[ "$DATASET" == "water" || "$DATASET" == "both" ]] && [ -d "$WATER" ]; then
   echo ""
   echo "--- Water: taxonomy assignment ---"
   "$ENV_PREFIX/bin/python3" scripts/5_assign_taxonomy.py \
@@ -152,12 +164,16 @@ if [ -d "$WATER" ]; then
       --skip_blast \
       2>&1 | tee "$WATER/logs/taxonomy_summary.log"
 else
-  echo "SKIP: $WATER not found"
+  if [[ "$DATASET" == "soil" ]]; then
+    echo "[dataset=soil] Skipping Water"
+  else
+    echo "SKIP: $WATER not found"
+  fi
 fi
 
 # -- Soil dataset (JEDI + COI) --
 SOIL="out/Soil_eDNA_JEDI_COI_14_01_26"
-if [ -d "$SOIL" ]; then
+if [[ "$DATASET" == "soil" || "$DATASET" == "both" ]] && [ -d "$SOIL" ]; then
   echo ""
   echo "--- Soil: taxonomy assignment ---"
   "$ENV_PREFIX/bin/python3" scripts/5_assign_taxonomy.py \
@@ -176,7 +192,11 @@ if [ -d "$SOIL" ]; then
       --skip_blast \
       2>&1 | tee "$SOIL/logs/taxonomy_summary.log"
 else
-  echo "SKIP: $SOIL not found"
+  if [[ "$DATASET" == "water" ]]; then
+    echo "[dataset=water] Skipping Soil"
+  else
+    echo "SKIP: $SOIL not found"
+  fi
 fi
 
 echo ""

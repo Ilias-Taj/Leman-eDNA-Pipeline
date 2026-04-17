@@ -262,6 +262,9 @@ Database Preparation:
                         help="Number of threads for VSEARCH (default: 4)")
     parser.add_argument("--confidence", type=float, default=0.8, 
                         help="SINTAX confidence threshold, 0-1 (default: 0.8)")
+    parser.add_argument("--tag", default=None,
+                        help="Subfolder name for taxonomy output (e.g. silva-midori2). "
+                             "Auto-derived from DB filenames if omitted. Lets multiple DB runs coexist.")
     
     args = parser.parse_args()
     
