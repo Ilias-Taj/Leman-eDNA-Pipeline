@@ -5,7 +5,7 @@
 Separates reads into marker bins based on sequence length:
 - 18S rRNA: 1,500-2,800 bp
 - COI:      500-900 bp   (standard Folmer/Leray primers, ~658 bp amplicon)
-- JEDI:     250-500 bp   (JEDI COI primers, ~460 bp amplicon)
+- JEDI:     250-500 bp   (JEDI universal rRNA V4-V5 primers, 515F-Y/926R)
 
 Use --markers to select which markers to search for (default: 18S,COI).
 Reads outside all selected marker ranges are discarded as noise.
@@ -38,7 +38,7 @@ from pathlib import Path
 MARKER_RANGES = {
     "18S":  (1500, 2800),   # 18S rRNA (~1.8 kb amplicon)
     "COI":  (500,  900),    # Standard COI Folmer/Leray (~658 bp amplicon)
-    "JEDI": (250,  500),    # JEDI short COI primers (~460 bp amplicon)
+    "JEDI": (250,  500),    # JEDI rRNA V4-V5 (515F-Y/926R, ~390-550 bp amplicon)
 }
 
 VALID_MARKERS = list(MARKER_RANGES.keys())

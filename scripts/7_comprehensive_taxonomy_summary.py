@@ -184,7 +184,7 @@ def detect_db_prefix(db_path, marker):
       silva_18s_v123.udb -> 'SILVA'
       eKOI_COI.udb       -> 'eKOI'
       midori2_COI.udb    -> 'MIDORI2'
-    Falls back to 'SILVA' for 18S, 'eKOI' for COI/JEDI if no path provided.
+    Falls back to 'SILVA' for 18S/JEDI (rRNA), 'eKOI' for COI if no path provided.
     """
     if db_path:
         from pathlib import Path as P
@@ -285,7 +285,7 @@ def main():
         otu_to_centroid = load_otu_to_centroid_mapping(otu_assignment_file)
         print(f"  Loaded {len(otu_to_centroid)} mappings")
         
-        # 3. Load taxonomy (SILVA for 18S, eKOI for COI/JEDI)
+        # 3. Load taxonomy (SILVA/PR2 for 18S and JEDI, eKOI for COI)
         # Detect DB prefix from database path
         db_arg = getattr(args, f'db_{marker}', None)
         db_prefix = detect_db_prefix(db_arg, marker)
@@ -339,7 +339,7 @@ def main():
                 if sample != 'total_abundance':
                     row[f'Sample_{sample}'] = abundance_df.loc[otu_id, sample]
             
-            # Add taxonomy (SILVA for 18S, MIDORI/eKOI for COI/JEDI)
+            # Add taxonomy (SILVA/PR2 for 18S and JEDI, MIDORI/eKOI for COI)
             # All levels stored with confidence — filtering done in notebooks
             centroid_id = otu_to_centroid.get(otu_id, '')
             tax_levels = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']

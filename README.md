@@ -8,15 +8,15 @@ This pipeline is designed for multi-marker amplicon sequencing (18S rRNA, COI, a
 |--------|------------|---------------|-------------|-------------------|
 | **18S** | 18S rRNA | 1,500–2,800 bp | Water eDNA (eukaryotes) | SILVA v123 |
 | **COI** | Cytochrome Oxidase I | 500–900 bp | Water/Soil (invertebrates, Folmer primers) | MIDORI2 / eKOI |
-| **JEDI** | COI (short) | 250–500 bp | Soil eDNA (arthropods, JEDI primers ~460 bp) | MIDORI2 / eKOI (same COI db) |
+| **JEDI** | SSU rRNA (V4-V5) | 250–500 bp | Soil eDNA (all domains, 515F-Y/926R) | SILVA / PR2 (rRNA db) |
 
 ## Next Student: What to Test First
 
 Please review the technical limitations and to-do list in [results_analysis.ipynb](results_analysis.ipynb) and focus on these immediate tests:
 
 1. **COI reference database:** Download and validate the **eKOI COI database** (see the COI Database section below) and confirm that SINTAX/BLAST assignments improve.
-2. **Test Soil JEDI data:** Run the pipeline on the Soil dataset using `--markers JEDI,COI`. JEDI uses the same MIDORI2/eKOI database since it also targets COI.
-3. **COI yield troubleshooting:** The previous >90% COI reads <300 bp issue may have been JEDI amplicons being misclassified. Verify with the new JEDI size range (250-500 bp).
+2. **Test Soil JEDI data:** Run the pipeline on the Soil dataset using `--markers JEDI,COI`. JEDI uses a rRNA database (SILVA/PR2) since it targets SSU rRNA V4-V5.
+3. **COI yield troubleshooting:** The previous >90% COI reads <300 bp issue was likely JEDI rRNA amplicons being misclassified as short COI. Fixed with JEDI size range (250-500 bp).
 4. **Blocking primers:** Evaluate blocking primers to reduce ciliate amplification in COI.
 5. **Local reference library:** Begin compiling local Swiss taxa for a custom COI/18S reference to reduce mis-assignments.
 6. **Dereplication:** Implement a dereplication step before clustering to speed up processing and reduce memory usage.
@@ -104,13 +104,13 @@ Once downloaded, convert it to UDB format using:
 
 ### JEDI Database
 
-**JEDI primers target COI** (shorter amplicon ~460 bp), so the same COI reference database works. No separate database is needed — point `--db_JEDI` to your MIDORI2 or eKOI COI database:
+**JEDI primers (515F-Y/926R) target V4-V5 of SSU rRNA** across all domains of life (~390-550 bp amplicon). Use a rRNA reference database (SILVA or PR2) — point `--db_JEDI` to your MIDORI2 or eKOI COI database:
 ```bash
-# Example: use MIDORI2 for both COI and JEDI
+# Example: use PR2 for JEDI (rRNA) and MIDORI2 for COI
 python3 scripts/5_assign_taxonomy.py \
     --input_dir out/run_name \
     --db_COI refs/midori2_COI.udb \
-    --db_JEDI refs/midori2_COI.udb
+    --db_JEDI refs/pr2_18S_v511.udb
 ```
 
 ## How to Run
@@ -177,10 +177,10 @@ python3 scripts/5_assign_taxonomy.py \
     --db_18S refs/silva_18s_v123.udb \
     --db_COI refs/midori2_COI.udb \
     --threads 12
-# For soil (JEDI + COI) — JEDI uses the same COI database:
+# For soil (JEDI + COI) — JEDI uses rRNA database, COI uses COI database:
 python3 scripts/5_assign_taxonomy.py \
     --input_dir "out/run_name" \
-    --db_JEDI refs/midori2_COI.udb \
+    --db_JEDI refs/pr2_18S_v511.udb \
     --db_COI refs/midori2_COI.udb \
     --threads 12
 

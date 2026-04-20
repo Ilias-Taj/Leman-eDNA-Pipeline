@@ -256,8 +256,8 @@ Database Preparation:
     parser.add_argument("--db_COI", 
                         help="Path to COI reference database (.udb format required)")
     parser.add_argument("--db_JEDI",
-                        help="Path to JEDI (COI) reference database (.udb format). "
-                             "JEDI targets COI, so the same MIDORI2/eKOI COI database works.")
+                        help="Path to JEDI rRNA reference database (.udb format). "
+                             "JEDI targets SSU rRNA V4-V5 (all domains), use SILVA or PR2.")
     parser.add_argument("--threads", type=int, default=4, 
                         help="Number of threads for VSEARCH (default: 4)")
     parser.add_argument("--confidence", type=float, default=0.8, 

@@ -349,11 +349,11 @@ for m in "${MARKER_ARRAY[@]}"; do
       fi
       ;;
     JEDI) 
-      # JEDI targets COI - prefer eKOI, fall back to MIDORI2
-      if [ -f refs/eKOI_COI.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/eKOI_COI.udb"
-      elif [ -f refs/midori2_COI.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/midori2_COI.udb"
+      # JEDI targets rRNA V4-V5 (all domains) - prefer PR2, fall back to SILVA
+      if [ -f refs/pr2_18S_v511.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/pr2_18S_v511.udb"
+      elif [ -f refs/silva_18s_v123.udb ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/silva_18s_v123.udb"
       fi
       ;;
   esac

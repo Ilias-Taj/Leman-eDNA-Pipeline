@@ -7,16 +7,16 @@ set -eo pipefail
 # Usage:
 #   bash regenerate_taxonomy.sh                                              # both datasets, auto-detect
 #   bash regenerate_taxonomy.sh --dataset water --db_18S silva --db_COI ekoi # water only, custom DBs
-#   bash regenerate_taxonomy.sh --dataset soil --db ekoi                     # soil only, eKOI for COI+JEDI
-#   bash regenerate_taxonomy.sh --db_18S silva --db_COI midori2 --db_JEDI eKOI
-#   bash regenerate_taxonomy.sh --db midori2                                 # set COI+JEDI
+#   bash regenerate_taxonomy.sh --dataset soil --db ekoi                     # soil only, eKOI for COI
+#   bash regenerate_taxonomy.sh --db_18S silva --db_COI midori2 --db_JEDI pr2
+#   bash regenerate_taxonomy.sh --db midori2                                 # set COI only
 #
 # Supported databases:
 #   --db_18S:  silva (default: refs/silva_18s_v123.udb)
 #              Add new 18S .udb files to refs/ and extend resolve_18s_db()
 #   --db_COI:  eKOI | midori2
-#   --db_JEDI: eKOI | midori2 | porter (JEDI is short-COI, same gene as COI)
-#   --db:      shorthand to set COI + JEDI to the same database
+#   --db_JEDI: silva | pr2 (JEDI targets rRNA V4-V5, same gene family as 18S)
+#   --db:      shorthand to set COI db (JEDI resolved separately via --db_JEDI)
 
 ENV_PREFIX="./env"
 THREADS=14
@@ -36,9 +36,8 @@ while [[ $# -gt 0 ]]; do
     --db_COI)  DB_COI_CHOICE="$2";  shift 2 ;;
     --db_JEDI) DB_JEDI_CHOICE="$2"; shift 2 ;;
     --db)
-      # Shorthand: set COI and JEDI to the same DB
+      # Shorthand: set COI db only (JEDI uses rRNA db, resolved separately)
       DB_COI_CHOICE="$2"
-      DB_JEDI_CHOICE="$2"
       shift 2
       ;;
     --dataset)
@@ -64,13 +63,14 @@ resolve_18s_db() {
     case "$choice" in
       silva|SILVA)
         echo "refs/silva_18s_v123.udb" ;;
-      pr2|PR2) echo "refs/pr2_18S_v511.udb" ;;
+      pr2|PR2)
+        echo "refs/pr2_18S_v511.udb" ;;
       *)
         # Treat as direct path if it exists
         if [ -f "$choice" ]; then
           echo "$choice"
         else
-          echo "ERROR: Unknown 18S database '$choice'. Use 'silva' or a path to a .udb file" >&2
+          echo "ERROR: Unknown 18S database '$choice'. Use 'silva', 'pr2', or a path to a .udb file" >&2
           exit 1
         fi
         ;;
@@ -95,13 +95,12 @@ resolve_coi_db() {
       eKOI|ekoi)       echo "refs/eKOI_COI.udb" ;;
       midori2|MIDORI2|midori|MIDORI) echo "refs/midori2_COI.udb" ;;
       porter|PORTER|porter_coi) echo "refs/porter_COI_v51.udb" ;;
-      pr2|PR2) echo "refs/pr2_18S_v511.udb" ;;
       *)
         # Treat as direct path if it exists
         if [ -f "$choice" ]; then
           echo "$choice"
         else
-          echo "ERROR: Unknown database '$choice' for $label. Use 'eKOI', 'midori2', 'porter', 'pr2', or a path to a .udb file" >&2
+          echo "ERROR: Unknown database '$choice' for $label. Use 'eKOI', 'midori2', 'porter', or a path to a .udb file" >&2
           exit 1
         fi
         ;;
@@ -121,7 +120,7 @@ resolve_coi_db() {
 
 DB_18S=$(resolve_18s_db "$DB_18S_CHOICE")
 COI_DB=$(resolve_coi_db "$DB_COI_CHOICE" "COI")
-JEDI_DB=$(resolve_coi_db "$DB_JEDI_CHOICE" "JEDI")
+JEDI_DB=$(resolve_18s_db "$DB_JEDI_CHOICE")
 
 # Verify files exist
 for db in "$DB_18S" "$COI_DB" "$JEDI_DB"; do
