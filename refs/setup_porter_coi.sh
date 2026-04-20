@@ -16,8 +16,9 @@ wget -c https://github.com/terrimporter/CO1Classifier/releases/download/SINTAX-C
 echo ""
 echo "=== Extracting .udb ==="
 unzip -o refs/SINTAX_COIv5.1.0.zip -d refs/
-# The zip contains SINTAX_COIv5.1.0.udb
-mv refs/SINTAX_COIv5.1.0.udb refs/porter_COI_v51.udb 2>/dev/null || true
+# The zip contains trained/sintax.udb inside
+mv refs/trained/sintax.udb refs/porter_COI_v51.udb
+rm -rf refs/trained
 
 echo ""
 echo "=== Cleanup ==="

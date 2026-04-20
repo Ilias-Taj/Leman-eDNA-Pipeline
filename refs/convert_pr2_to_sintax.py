@@ -2,29 +2,25 @@
 """
 Convert PR2 SSU DADA2 fasta to VSEARCH SINTAX format for 18S classification.
 
-PR2 DADA2 format (header):
-  >Accession Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species
+PR2 DADA2 format (header) - NO accession, just taxonomy:
+  >Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
 
 VSEARCH SINTAX format:
   >Accession;tax=d:Kingdom,k:Supergroup,p:Division,c:Subdivision,o:Class,f:Family,g:Genus,s:Species;
 
-Mapping (PR2 9-level → SINTAX 8-level):
+Mapping (PR2 9-level -> SINTAX 8-level):
   d: = Kingdom (Eukaryota)
   k: = Supergroup (Obazoa, TSAR, Archaeplastida...)
   p: = Division (Opisthokonta, Alveolata, Stramenopiles...)
   c: = Subdivision (Metazoa, Ciliophora, Dinoflagellata...)
-  o: = Class (used as Order in SINTAX for broader classification)
-  f: = Family (PR2 Order+Family collapsed when _X placeholders)
+  o: = Class
+  f: = Family (or Order if Family is placeholder)
   g: = Genus
   s: = Species
 
-Note: PR2 has 9 taxonomic levels but SINTAX supports 8. We collapse
-Order into o: when it's a placeholder, otherwise keep Class as o: and
-Order as f: prefix.
-
 Usage:
-  python refs/convert_pr2_to_sintax.py \
-      --input refs/pr2_version_5.1.1_SSU_dada2.fasta \
+  python3 refs/convert_pr2_to_sintax.py \
+      --input refs/pr2_version_5.1.1_SSU_dada2.fasta.gz \
       --output refs/pr2_18S_SINTAX.fasta
 
 Then build the .udb:
@@ -44,6 +40,8 @@ def clean_field(field):
     field = field.strip()
     # Remove placeholder suffixes like _X, _XX, _XXX
     field = re.sub(r'_X+$', '', field)
+    # Remove _sp. suffix
+    field = re.sub(r'_sp\.$', '', field)
     if not field:
         return ""
     # Replace spaces with underscores for SINTAX compatibility
@@ -51,20 +49,24 @@ def clean_field(field):
     return field
 
 
-def convert_header(header_line):
+def convert_header(header_line, seq_idx):
     """Convert a PR2 DADA2 header to SINTAX format.
 
-    Expected format: >Accession Kingdom;Supergroup;Division;...;Species
+    PR2 DADA2 format has NO accession - header is just semicolon-separated taxonomy:
+      >Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
+    We generate a synthetic accession from the sequence index.
     """
-    line = header_line.lstrip('>').strip()
+    line = header_line.lstrip('>').strip().rstrip(';')
 
-    # Split on first space: accession vs taxonomy
-    parts = line.split(' ', 1)
-    if len(parts) < 2:
-        return None
-
-    accession = parts[0].strip()
-    taxonomy = parts[1].strip()
+    # Check if there's an accession (space-separated) or pure taxonomy
+    if ' ' in line:
+        parts = line.split(' ', 1)
+        accession = parts[0].strip()
+        taxonomy = parts[1].strip().rstrip(';')
+    else:
+        # Pure taxonomy (PR2 DADA2 format) - generate accession
+        accession = f'PR2_{seq_idx:06d}'
+        taxonomy = line
 
     # Split taxonomy by semicolons
     fields = [f.strip() for f in taxonomy.split(';')]
@@ -88,9 +90,9 @@ def convert_header(header_line):
     species     = clean_field(fields[8]) if len(fields) > 8 else ''
 
     # Build SINTAX taxonomy string (8 levels max)
-    # Use class as order-level (o:) and family as family-level (f:)
-    # If order is empty/placeholder, use class as order
-    order_name = pr2_order if pr2_order else pr2_class
+    # o: = Class (PR2 class is typically order-level equivalent)
+    # f: = Family (or Order if family is empty)
+    order_name = pr2_class if pr2_class else pr2_order
     family_name = pr2_family if pr2_family else pr2_order
 
     tax_parts = []
@@ -140,18 +142,21 @@ def main():
     skipped = 0
 
     with fin, open(args.output, 'w', encoding='utf-8') as fout:
+        last_valid = False
         for line in fin:
             line = line.rstrip('\n')
             if line.startswith('>'):
-                new_header = convert_header(line)
+                new_header = convert_header(line, converted + skipped + 1)
                 if new_header:
                     fout.write(new_header + '\n')
                     converted += 1
+                    last_valid = True
                 else:
                     skipped += 1
+                    last_valid = False
             else:
                 # Only write sequence if the previous header was valid
-                if converted > 0 or skipped == 0:
+                if last_valid:
                     fout.write(line + '\n')
 
     print(f"Converted {converted:,} sequences ({skipped:,} skipped)")

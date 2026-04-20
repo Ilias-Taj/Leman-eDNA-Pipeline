@@ -29,3 +29,6 @@ __pycache__/
 
 # Editor/IDE
 .vscode/
+
+# Presentation (not part of project)
+Presentation_eDNA_Results.ipynb

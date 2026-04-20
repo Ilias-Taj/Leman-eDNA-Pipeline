@@ -64,8 +64,7 @@ resolve_18s_db() {
     case "$choice" in
       silva|SILVA)
         echo "refs/silva_18s_v123.udb" ;;
-      # Add new 18S databases here:
-      # pr2|PR2) echo "refs/pr2_18s.udb" ;;
+      pr2|PR2) echo "refs/pr2_18S_v511.udb" ;;
       *)
         # Treat as direct path if it exists
         if [ -f "$choice" ]; then
@@ -95,6 +94,7 @@ resolve_coi_db() {
     case "$choice" in
       eKOI|ekoi)       echo "refs/eKOI_COI.udb" ;;
       midori2|MIDORI2|midori|MIDORI) echo "refs/midori2_COI.udb" ;;
+      porter|PORTER|porter_coi) echo "refs/porter_COI_v51.udb" ;;
       *)
         # Treat as direct path if it exists
         if [ -f "$choice" ]; then

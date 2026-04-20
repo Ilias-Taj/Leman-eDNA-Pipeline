@@ -15,7 +15,7 @@ wget -c https://github.com/pr2database/pr2database/releases/download/v5.1.1/pr2_
 
 echo ""
 echo "=== Converting PR2 DADA2 format -> VSEARCH SINTAX format ==="
-python refs/convert_pr2_to_sintax.py \
+python3 refs/convert_pr2_to_sintax.py \
     --input refs/pr2_version_5.1.1_SSU_dada2.fasta.gz \
     --output refs/pr2_18S_SINTAX.fasta
 
