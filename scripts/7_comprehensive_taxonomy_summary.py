@@ -197,6 +197,8 @@ def detect_db_prefix(db_path, marker):
             return "eKOI"
         elif 'pr2' in name:
             return "PR2"
+        elif 'porter' in name:
+            return "Porter"
     # Defaults when no path given
     if marker == "18S":
         return "SILVA"
