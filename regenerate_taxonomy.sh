@@ -15,7 +15,7 @@ set -eo pipefail
 #   --db_18S:  silva (default: refs/silva_18s_v123.udb)
 #              Add new 18S .udb files to refs/ and extend resolve_18s_db()
 #   --db_COI:  eKOI | midori2
-#   --db_JEDI: eKOI | midori2
+#   --db_JEDI: eKOI | midori2 | pr2 (recommended for 18S-like JEDI marker)
 #   --db:      shorthand to set COI + JEDI to the same database
 
 ENV_PREFIX="./env"
@@ -95,12 +95,13 @@ resolve_coi_db() {
       eKOI|ekoi)       echo "refs/eKOI_COI.udb" ;;
       midori2|MIDORI2|midori|MIDORI) echo "refs/midori2_COI.udb" ;;
       porter|PORTER|porter_coi) echo "refs/porter_COI_v51.udb" ;;
+      pr2|PR2) echo "refs/pr2_18S_v511.udb" ;;
       *)
         # Treat as direct path if it exists
         if [ -f "$choice" ]; then
           echo "$choice"
         else
-          echo "ERROR: Unknown database '$choice' for $label. Use 'eKOI', 'midori2', or a path to a .udb file" >&2
+          echo "ERROR: Unknown database '$choice' for $label. Use 'eKOI', 'midori2', 'porter', 'pr2', or a path to a .udb file" >&2
           exit 1
         fi
         ;;
