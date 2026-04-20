@@ -15,7 +15,7 @@ set -eo pipefail
 #   --db_18S:  silva (default: refs/silva_18s_v123.udb)
 #              Add new 18S .udb files to refs/ and extend resolve_18s_db()
 #   --db_COI:  eKOI | midori2
-#   --db_JEDI: eKOI | midori2 | pr2 (recommended for 18S-like JEDI marker)
+#   --db_JEDI: eKOI | midori2 | porter (JEDI is short-COI, same gene as COI)
 #   --db:      shorthand to set COI + JEDI to the same database
 
 ENV_PREFIX="./env"
