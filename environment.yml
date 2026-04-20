@@ -8,6 +8,7 @@ dependencies:
   - python=3.10
   - mamba       
   - pip
+  - unzip
   
   # --- Bioinformatics Tools ---
   - filtlong              # Quality filtering for long reads

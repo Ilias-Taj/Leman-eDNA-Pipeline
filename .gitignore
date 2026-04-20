@@ -32,3 +32,6 @@ __pycache__/
 
 # Presentation (not part of project)
 Presentation_eDNA_Results.ipynb
+/presentation/
+*.pptx
+build_presentation.py
