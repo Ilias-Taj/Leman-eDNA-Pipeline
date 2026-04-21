@@ -251,3 +251,8 @@ This workflow was developed for the [Genorobotics](https://make.epfl.ch/projects
 
 - **ONT-AmpSeq:** The clustering and consensus generation strategy is heavily inspired by the [ONT-AmpSeq pipeline](https://github.com/michoug/ONT-AmpSeq).
 - **SILVA Database:** 18S rRNA reference database from [SILVA v123](https://www.arb-silva.de/), pre-formatted for SINTAX available at [USEARCH SINTAX Downloads](https://www.drive5.com/usearch/manual/sintax_downloads.html)
+- **ekoi Database:** A Novel Taxonomic Database for eukaryotic Mitochondrial Cytochrome Oxidase subunit I Gene (eKOI): Enhancing taxonomic resolution at community-level in metabarcoding analyses
+Ruben Gonzalez-Miguens, Alex Galvez-Morante, Margarita Skamnelou, Meritxell Anto, Elena Casacuberta, Daniel J. Richter, Daniel Vaulot, Javier del Campo, Inaki Ruiz-Trillo
+bioRxiv 2024.12.05.626972; doi: https://doi.org/10.1101/2024.12.05.626972
+- **pr2 Database:** Guillou, L., Bachar, D., Audic, S., Bass, D., Berney, C., Bittner, L., Boutte, C. et al. 2013. [The Protist Ribosomal Reference database (PR<sup>2</sup>): a catalog of unicellular eukaryote Small Sub-Unit rRNA sequences with curated taxonomy](http://nar.oxfordjournals.org/lookup/doi/10.1093/nar/gks1160). Nucleic Acids Res. 41:D597–604.
+- **Porter CO1 Database:** Teresita M. Porter. (2017, December 4). Eukaryote CO1 Reference Set For The RDP Classifier (Version v4.0.1). Zenodo. http://doi.org/10.5281/zenodo.4741447 
