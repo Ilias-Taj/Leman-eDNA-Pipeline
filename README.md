@@ -227,7 +227,6 @@ The `taxonomy_summary/comprehensive_taxonomy_{marker}.csv` files are ready for d
 | `Soil_results_analysis SILV-MIDO.ipynb` | Soil results with SILVA (JEDI) + MIDORI2 (COI) |
 | `Soil_results_analysis SILV-eKOI.ipynb` | Soil results with SILVA (JEDI) + eKOI (COI) |
 | `Soil_results_analysis PR2-Porter.ipynb` | Soil results with PR2 (JEDI) + Porter (COI) |
-| `Presentation_eDNA_Results.ipynb` | Summary presentation with DB comparison plots |
 | `results_analysis.ipynb` | Presentation notebook (generates PPTX) |
 
 Each analysis notebook includes: confidence dashboards, DB performance comparison, taxonomy bar plots, BLAST validation, cross-marker analysis, and Top 20 Eukaryotic Genera plots (filtered by confidence ≥ 0.8).
@@ -279,7 +278,6 @@ Each analysis notebook includes: confidence dashboards, DB performance compariso
 ├── create_env.sh               # Environment setup
 ├── environment.yml             # Conda environment spec
 ├── *_results_analysis *.ipynb  # Analysis notebooks (6 DB combinations)
-├── Presentation_eDNA_Results.ipynb
 └── results_analysis.ipynb      # Presentation generator
 ```
 
