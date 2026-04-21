@@ -12,6 +12,17 @@ set -eo pipefail
 #   nohup bash scripts/run_both_datasets.sh > out/logs/pipeline_combined.log 2>&1 &
 #   tail -f out/logs/pipeline_water.log   # or pipeline_soil.log
 
+# Database preferences (override with env vars or edit here)
+DB_18S="${DB_18S:-}"     # pr2 (default), silva, or path
+DB_COI="${DB_COI:-}"     # midori2 (default), ekoi, porter, or path
+DB_JEDI="${DB_JEDI:-}"   # pr2 (default), silva, or path
+
+# Build --db_* flags if set
+DB_ARGS=""
+[ -n "$DB_18S" ]  && DB_ARGS="$DB_ARGS --db_18S $DB_18S"
+[ -n "$DB_COI" ]  && DB_ARGS="$DB_ARGS --db_COI $DB_COI"
+[ -n "$DB_JEDI" ] && DB_ARGS="$DB_ARGS --db_JEDI $DB_JEDI"
+
 WATER_LOG="out/logs/pipeline_water.log"
 SOIL_LOG="out/logs/pipeline_soil.log"
 mkdir -p out/logs
@@ -25,7 +36,7 @@ echo "=============================================="
 bash scripts/run_full_pipeline.sh \
   --root data/Water_eDNA_18S_COI_14_01_26/fastq_pass \
   --markers 18S,COI \
-  --threads 14 2>&1 | tee "$WATER_LOG"
+  --threads 14 $DB_ARGS 2>&1 | tee "$WATER_LOG"
 
 echo ""
 echo "=============================================="
@@ -42,7 +53,7 @@ echo "=============================================="
 bash scripts/run_full_pipeline.sh \
   --root data/Soil_eDNA_JEDI_COI_14_01_26/fastq_pass \
   --markers JEDI,COI \
-  --threads 14 2>&1 | tee "$SOIL_LOG"
+  --threads 14 $DB_ARGS 2>&1 | tee "$SOIL_LOG"
 
 echo ""
 echo "=============================================="

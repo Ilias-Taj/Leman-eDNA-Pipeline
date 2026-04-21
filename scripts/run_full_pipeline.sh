@@ -16,6 +16,11 @@ MIN_LENGTH=0
 MIN_MEAN_Q=20
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
 
+# Database overrides (empty = auto-detect from refs/)
+DB_18S=""   # e.g. silva, pr2, or path to .udb
+DB_COI=""   # e.g. midori2, ekoi, porter, or path to .udb
+DB_JEDI=""  # e.g. pr2, silva, or path to .udb (JEDI uses rRNA/18S databases)
+
 # Detect system resources
 if [[ "$OSTYPE" == "darwin"* ]]; then
   CPU_CORES=$(sysctl -n hw.ncpu)
@@ -41,6 +46,9 @@ Options:
   --markers LIST     Comma-separated markers to search for (default: "$MARKERS")
                      Valid markers: 18S, COI, JEDI
                      Examples: "18S,COI" (water), "JEDI,COI" (soil), "18S,COI,JEDI" (all)
+  --db_18S DB        18S database: pr2 (default), silva, or path to .udb
+  --db_COI DB        COI database: midori2 (default), ekoi, porter, or path to .udb
+  --db_JEDI DB       JEDI database: pr2 (default), silva, or path to .udb
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -79,6 +87,9 @@ while [[ $# -gt 0 ]]; do
     --keep_percent) KEEP_PERCENT="$2"; shift 2;;
     --min_length) MIN_LENGTH="$2"; shift 2;;
     --min_mean_q) MIN_MEAN_Q="$2"; shift 2;;
+    --db_18S) DB_18S="$2"; shift 2;;
+    --db_COI) DB_COI="$2"; shift 2;;
+    --db_JEDI) DB_JEDI="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -334,27 +345,57 @@ update_progress "[TAXONOMY] Starting taxonomy assignment..."
 taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
 
+# ── Resolve database paths ──
+resolve_18s_db() {
+  local choice="$1"
+  if [ -n "$choice" ]; then
+    case "$choice" in
+      pr2|PR2)     echo "refs/pr2_18S_v511.udb" ;;
+      silva|SILVA) echo "refs/silva_18s_v123.udb" ;;
+      *) [ -f "$choice" ] && echo "$choice" || { echo "ERROR: Unknown 18S DB '$choice'" >&2; exit 1; } ;;
+    esac
+  else
+    # Default: prefer PR2, fall back to SILVA
+    if [ -f refs/pr2_18S_v511.udb ]; then echo "refs/pr2_18S_v511.udb"
+    elif [ -f refs/silva_18s_v123.udb ]; then echo "refs/silva_18s_v123.udb"
+    else echo ""; fi
+  fi
+}
+
+resolve_coi_db() {
+  local choice="$1"
+  if [ -n "$choice" ]; then
+    case "$choice" in
+      midori2|MIDORI2|midori) echo "refs/midori2_COI.udb" ;;
+      ekoi|eKOI)              echo "refs/eKOI_COI.udb" ;;
+      porter|PORTER)          echo "refs/porter_COI_v51.udb" ;;
+      *) [ -f "$choice" ] && echo "$choice" || { echo "ERROR: Unknown COI DB '$choice'" >&2; exit 1; } ;;
+    esac
+  else
+    # Default: prefer MIDORI2, fall back to eKOI, then Porter
+    if [ -f refs/midori2_COI.udb ]; then echo "refs/midori2_COI.udb"
+    elif [ -f refs/eKOI_COI.udb ]; then echo "refs/eKOI_COI.udb"
+    elif [ -f refs/porter_COI_v51.udb ]; then echo "refs/porter_COI_v51.udb"
+    else echo ""; fi
+  fi
+}
+
 # Build database arguments dynamically based on active markers
 TAXONOMY_DB_ARGS=""
 IFS=',' read -ra MARKER_ARRAY <<< "$MARKERS"
 for m in "${MARKER_ARRAY[@]}"; do
   case "$m" in
-    18S) [ -f refs/silva_18s_v123.udb ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S refs/silva_18s_v123.udb" ;;
-    COI)
-      # Prefer eKOI (broader eukaryote COI coverage), fall back to MIDORI2
-      if [ -f refs/eKOI_COI.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/eKOI_COI.udb"
-      elif [ -f refs/midori2_COI.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI refs/midori2_COI.udb"
-      fi
+    18S)
+      _db=$(resolve_18s_db "$DB_18S")
+      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S $_db"
       ;;
-    JEDI) 
-      # JEDI targets rRNA V4-V5 (all domains) - prefer PR2, fall back to SILVA
-      if [ -f refs/pr2_18S_v511.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/pr2_18S_v511.udb"
-      elif [ -f refs/silva_18s_v123.udb ]; then
-        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI refs/silva_18s_v123.udb"
-      fi
+    COI)
+      _db=$(resolve_coi_db "$DB_COI")
+      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI $_db"
+      ;;
+    JEDI)
+      _db=$(resolve_18s_db "$DB_JEDI")
+      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI $_db"
       ;;
   esac
 done
