@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -eo pipefail
-# run_both_datasets.sh
+# scripts/run_both_datasets.sh
 # Runs the full eDNA pipeline sequentially: Water first, then Soil.
 # Each dataset gets its own independent log file while output is also
 # printed to the terminal so you can follow progress live.
 #
 # Usage (foreground – see output live):
-#   bash run_both_datasets.sh
+#   bash scripts/run_both_datasets.sh
 #
 # Usage (background – follow with tail):
-#   nohup bash run_both_datasets.sh > out/logs/pipeline_combined.log 2>&1 &
+#   nohup bash scripts/run_both_datasets.sh > out/logs/pipeline_combined.log 2>&1 &
 #   tail -f out/logs/pipeline_water.log   # or pipeline_soil.log
 
 WATER_LOG="out/logs/pipeline_water.log"

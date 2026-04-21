@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -eo pipefail
-# regenerate_taxonomy.sh
+# scripts/regenerate_taxonomy.sh
 # Re-runs taxonomy assignment (step 5) and comprehensive summary (step 7)
 # for both Water and Soil datasets using the fixed confidence-filtered scripts.
 #
 # Usage:
-#   bash regenerate_taxonomy.sh                                              # both datasets, auto-detect
-#   bash regenerate_taxonomy.sh --dataset water --db_18S silva --db_COI ekoi # water only, custom DBs
-#   bash regenerate_taxonomy.sh --dataset soil --db ekoi                     # soil only, eKOI for COI
-#   bash regenerate_taxonomy.sh --db_18S silva --db_COI midori2 --db_JEDI pr2
-#   bash regenerate_taxonomy.sh --db midori2                                 # set COI only
+#   bash scripts/regenerate_taxonomy.sh                                              # both datasets, auto-detect
+#   bash scripts/regenerate_taxonomy.sh --dataset water --db_18S silva --db_COI ekoi # water only, custom DBs
+#   bash scripts/regenerate_taxonomy.sh --dataset soil --db ekoi                     # soil only, eKOI for COI
+#   bash scripts/regenerate_taxonomy.sh --db_18S silva --db_COI midori2 --db_JEDI pr2
+#   bash scripts/regenerate_taxonomy.sh --db midori2                                 # set COI only
 #
 # Supported databases:
 #   --db_18S:  silva (default: refs/silva_18s_v123.udb)
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown argument: $1" >&2
-      echo "Usage: bash regenerate_taxonomy.sh [--dataset water|soil|both] [--db_18S DB] [--db_COI DB] [--db_JEDI DB] [--db DB]" >&2
+      echo "Usage: bash scripts/regenerate_taxonomy.sh [--dataset water|soil|both] [--db_18S DB] [--db_COI DB] [--db_JEDI DB] [--db DB]" >&2
       exit 1
       ;;
   esac

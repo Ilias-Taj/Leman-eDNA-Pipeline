@@ -14,8 +14,6 @@ data/*
 # Reference DB (ignore contents but keep folder structure)
 refs/*
 !refs/.gitkeep
-!refs/*.py
-!refs/*.sh
 
 # Archived third-party or copied scripts
 /archive/
@@ -34,4 +32,3 @@ __pycache__/
 Presentation_eDNA_Results.ipynb
 /presentation/
 *.pptx
-build_presentation.py

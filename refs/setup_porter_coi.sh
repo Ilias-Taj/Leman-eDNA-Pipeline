@@ -29,4 +29,4 @@ echo "Done! Database saved to: refs/porter_COI_v51.udb"
 ls -lh refs/porter_COI_v51.udb
 echo ""
 echo "Usage:"
-echo "  bash regenerate_taxonomy.sh --db_COI refs/porter_COI_v51.udb --dataset both"
+echo "  bash scripts/regenerate_taxonomy.sh --db_COI refs/porter_COI_v51.udb --dataset both"

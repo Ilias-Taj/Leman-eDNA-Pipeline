@@ -11,3 +11,7 @@ REMAINING:
 
 -Target 18S, COI, Jedi by alternative other than size (primer-based classification for overlapping ranges).
 -Compile local Swiss taxa reference library.
+-README:- Clean up 
+        - Add Plots
+-Add plot of top 20 eukaryot only.
+-Dereplicate after clustering.  

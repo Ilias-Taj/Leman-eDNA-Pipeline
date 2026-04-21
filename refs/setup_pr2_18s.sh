@@ -33,4 +33,4 @@ echo "Done! Database saved to: refs/pr2_18S_v511.udb"
 ls -lh refs/pr2_18S_v511.udb
 echo ""
 echo "Usage:"
-echo "  bash regenerate_taxonomy.sh --db_18S refs/pr2_18S_v511.udb --dataset water"
+echo "  bash scripts/regenerate_taxonomy.sh --db_18S refs/pr2_18S_v511.udb --dataset water"
