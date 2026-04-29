@@ -32,13 +32,20 @@ import sys
 import gzip
 from pathlib import Path
 
+# Ensure scripts/ is on the import path so utils.py can be found from any working directory
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils import SKIP_DIRS
+
 # Sequence length thresholds (bp) for each marker
 # Derived from empirical sequencing data:
 #   Water run N50=1.6kb (18S dominates), Soil run N50=636bp (JEDI+COI mix)
+# Length windows are non-overlapping so each read maps to at most one marker.
+# Reads outside all windows are discarded as "ambiguous" (adapter dimers,
+# concatemers, or off-target amplification).
 MARKER_RANGES = {
-    "18S":  (1500, 2800),   # 18S rRNA (~1.8 kb amplicon)
-    "COI":  (500,  900),    # Standard COI Folmer/Leray (~658 bp amplicon)
-    "JEDI": (250,  500),    # JEDI rRNA V4-V5 (515F-Y/926R, ~390-550 bp amplicon)
+    "18S":  (1500, 2800),   # 18S rRNA full-length (~1.8 kb amplicon)
+    "COI":  (500,  900),    # COI Folmer/Leray (~658 bp target)
+    "JEDI": (250,  500),    # JEDI rRNA V4-V5, 515F-Y/926R (~390 bp target)
 }
 
 VALID_MARKERS = list(MARKER_RANGES.keys())
@@ -172,7 +179,8 @@ def main():
     for barcode_dir in sorted(input_dir.iterdir()):
         if not barcode_dir.is_dir():
             continue
-        if barcode_dir.name in ("logs", "validation", "merged", "temp_clustering", "taxonomy", "taxonomy_summary", "blast_results"):
+        # Skip pipeline output directories (only process barcode folders)
+        if barcode_dir.name in SKIP_DIRS:
             continue
         
         result = process_barcode(barcode_dir, active_markers)

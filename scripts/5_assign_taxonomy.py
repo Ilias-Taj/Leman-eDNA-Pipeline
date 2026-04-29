@@ -44,31 +44,12 @@ Output:
 import argparse
 import sys
 import subprocess
-import shutil
 from pathlib import Path
 
+# Ensure scripts/ is on the import path so utils.py can be found from any working directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from db_tag import derive_tag
-
-def check_vsearch():
-    """Check if vsearch is installed."""
-    candidates = [
-        Path("./env/bin/vsearch"),
-        Path("/opt/homebrew/bin/vsearch"),
-        Path("/usr/local/bin/vsearch"),
-    ]
-    
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    
-    vsearch = shutil.which("vsearch")
-    if vsearch:
-        return vsearch
-    
-    print("ERROR: 'vsearch' tool not found. Please install it:", file=sys.stderr)
-    print("  brew install vsearch  (or conda install -c bioconda vsearch)", file=sys.stderr)
-    sys.exit(1)
+from db_tag import label_from_path
+from utils import find_tool
 
 def run_sintax(consensus_fasta, output_file, db_path, vsearch_path, threads, confidence=0.8):
     """
@@ -108,7 +89,7 @@ def run_sintax(consensus_fasta, output_file, db_path, vsearch_path, threads, con
         print(f"SINTAX Failed:\n{result.stderr}", file=sys.stderr)
         return False
     
-    print(f"✓ Taxonomy assignment complete.")
+    print(f"[OK] Taxonomy assignment complete.")
     return True
 
 def parse_sintax_output(sintax_file, marker):
@@ -263,7 +244,7 @@ Database Preparation:
     parser.add_argument("--confidence", type=float, default=0.8, 
                         help="SINTAX confidence threshold, 0-1 (default: 0.8)")
     parser.add_argument("--tag", default=None,
-                        help="Subfolder name for taxonomy output (e.g. silva-midori2). "
+                        help="Subfolder name for taxonomy output (e.g. silva). "
                              "Auto-derived from DB filenames if omitted. Lets multiple DB runs coexist.")
     
     args = parser.parse_args()
@@ -272,7 +253,7 @@ Database Preparation:
     if not args.db_18S and not args.db_COI and not args.db_JEDI:
         parser.error("At least one database (--db_18S, --db_COI, or --db_JEDI) must be provided")
     
-    vsearch_path = check_vsearch()
+    vsearch_path = find_tool("vsearch")
     
     if not vsearch_path:
         print("ERROR: VSEARCH not found in PATH.", file=sys.stderr)
@@ -286,12 +267,13 @@ Database Preparation:
         print(f"ERROR: temp_clustering directory not found: {temp_dir}", file=sys.stderr)
         sys.exit(1)
     
-    # Derive DB tag and create taxonomy output subdirectory (per-DB)
-    tag = args.tag or derive_tag([args.db_18S, args.db_COI, args.db_JEDI])
-    taxonomy_dir = input_dir / "taxonomy" / tag
-    taxonomy_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[tag] DB tag: {tag}")
-    print(f"[tag] Writing taxonomy outputs to: {taxonomy_dir}")
+    # Per-marker DB labels for output paths: taxonomy/{MARKER}/{db_label}/
+    # Each marker gets its own subfolder so different DB combos don't duplicate files.
+    db_labels = {}
+    for marker_name, db_path in [("18S", args.db_18S), ("COI", args.db_COI), ("JEDI", args.db_JEDI)]:
+        if db_path:
+            db_labels[marker_name] = args.tag or label_from_path(db_path)
+    print(f"[tag] Per-marker DB labels: {db_labels}")
     
     markers = {
         "18S": args.db_18S,
@@ -320,7 +302,10 @@ Database Preparation:
             print(f"Skipping {marker}. Run clustering first.")
             continue
         
-        # Output taxonomy file
+        # Output: taxonomy/{MARKER}/{db_label}/taxonomy_{MARKER}.txt
+        db_label = db_labels.get(marker, "default")
+        taxonomy_dir = input_dir / "taxonomy" / marker / db_label
+        taxonomy_dir.mkdir(parents=True, exist_ok=True)
         taxonomy_file = taxonomy_dir / f"taxonomy_{marker}.txt"
         
         # Run SINTAX
@@ -341,16 +326,21 @@ Database Preparation:
     print(f"\n{'='*60}")
     print("TAXONOMY ASSIGNMENT COMPLETE")
     print(f"{'='*60}")
-    print(f"Output directory: {taxonomy_dir}")
+    for m, lab in db_labels.items():
+        print(f"  taxonomy/{m}/{lab}/taxonomy_{m}.txt")
     print("\nFiles created:")
     if args.db_18S:
         print("  - taxonomy_18S.txt")
     if args.db_COI:
         print("  - taxonomy_COI.txt")
-    print("\nNote: You need to download and prepare reference databases:")
-    print("  18S: SILVA database (https://www.arb-silva.de/)")
-    print("  COI: BOLD database (http://www.boldsystems.org/)")
-    print("  Convert to .udb format: vsearch --makeudb_usearch input.fasta --output db.udb")
+    print("\nDatabases used:")
+    if args.db_18S:
+        print(f"  18S: {args.db_18S}")
+    if args.db_COI:
+        print(f"  COI: {args.db_COI}")
+    if args.db_JEDI:
+        print(f"  JEDI: {args.db_JEDI}")
+    print("See README.md for database setup instructions.")
 
 if __name__ == "__main__":
     main()

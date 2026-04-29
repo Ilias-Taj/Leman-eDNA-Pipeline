@@ -31,6 +31,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure scripts/ is on the import path so utils.py can be found from any working directory
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils import find_tool
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -71,18 +75,11 @@ def main():
     print(f"Keep percent: {args.keep_percent}%")
     print()
 
-    # Get filtlong path from environment
-    filtlong_path = shutil.which("filtlong")
-    if not filtlong_path:
-        # Try local conda env
-        env_filtlong = Path("./env/bin/filtlong")
-        if env_filtlong.exists():
-            filtlong_path = str(env_filtlong)
-        else:
-            print("ERROR: filtlong not found in PATH or ./env/bin/", file=sys.stderr)
-            sys.exit(1)
+    # Locate filtlong executable (checks ./env/bin, system PATH, common locations)
+    filtlong_path = find_tool("filtlong")
 
-    # If multiple files, concatenate them first to a temp file
+    # MinION outputs multiple FASTQ chunks per barcode.
+    # Concatenate them into a single gzip stream before filtering.
     if len(input_files) > 1:
         print(f"Concatenating {len(input_files)} files...")
         temp_concat = out_dir / "temp_concatenated.fastq.gz"
@@ -129,7 +126,7 @@ def main():
         if len(input_files) > 1 and temp_concat.exists():
             temp_concat.unlink()
 
-    print(f"\n✓ Filtered reads saved to: {filtered_output}")
+    print(f"\n[OK] Filtered reads saved to: {filtered_output}")
     print("\nNext step: Classify markers with scripts/2_classify_markers.py")
 
 

@@ -25,26 +25,16 @@ Output:
 import argparse
 import sys
 import subprocess
-import shutil
 from pathlib import Path
 import gzip
-import os
 import time
 
+# Ensure scripts/ is on the import path so utils.py can be found from any working directory
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils import find_tool, timer, SKIP_DIRS
 
-def timer(label):
-    """Context manager to time a block and print elapsed seconds."""
-    class Timer:
-        def __init__(self, label):
-            self.label = label
-            self.elapsed = 0
-        def __enter__(self):
-            self.start = time.time()
-            return self
-        def __exit__(self, *args):
-            self.elapsed = time.time() - self.start
-            print(f"[TIME] {self.label}: {self.elapsed:.1f}s")
-    return Timer(label)
+
+# timer() imported from utils
 
 def remove_chimeras(working_dir, marker, vsearch_path):
     """
@@ -68,7 +58,14 @@ def remove_chimeras(working_dir, marker, vsearch_path):
     return consensus_clean, chimeras_file
 
 def load_chimera_ids(chimeras_fasta):
-    """Load chimera centroid IDs from a FASTA file."""
+    """Load chimera centroid IDs from a FASTA file.
+
+    VSEARCH consensus headers look like:
+        >centroid=UUID|barcode|marker;seqs=N
+    The UC file uses bare IDs without the 'centroid=' prefix:
+        UUID|barcode|marker
+    We strip 'centroid=' so the IDs match during filtering.
+    """
     chimera_ids = set()
     if not chimeras_fasta.exists():
         return chimera_ids
@@ -77,29 +74,12 @@ def load_chimera_ids(chimeras_fasta):
             if line.startswith('>'):
                 header = line[1:].strip().split()[0]
                 clean_id = header.split(';')[0]
+                # Strip VSEARCH "centroid=" prefix to match UC file format
+                clean_id = clean_id.replace('centroid=', '')
                 chimera_ids.add(clean_id)
     return chimera_ids
 
-def check_vsearch():
-    """Check if vsearch is installed."""
-    # Try multiple locations
-    candidates = [
-        Path("./env/bin/vsearch"),
-        Path("/opt/homebrew/bin/vsearch"),
-        Path("/usr/local/bin/vsearch"),
-    ]
-    
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    
-    vsearch = shutil.which("vsearch")
-    if vsearch:
-        return vsearch
-    
-    print("ERROR: 'vsearch' tool not found. Please install it:", file=sys.stderr)
-    print("  brew install vsearch  (or conda install -c bioconda vsearch)", file=sys.stderr)
-    sys.exit(1)
+
 
 def concatenate_reads_by_marker(input_dir, marker, output_fasta):
     """
@@ -111,7 +91,7 @@ def concatenate_reads_by_marker(input_dir, marker, output_fasta):
     total_reads = 0
     with open(output_fasta, 'w') as out_f:
         for sample_dir in sorted(input_dir.iterdir()):
-            if not sample_dir.is_dir() or sample_dir.name in ("logs", "validation", "merged", "temp_clustering"):
+            if not sample_dir.is_dir() or sample_dir.name in SKIP_DIRS:
                 continue
 
             fq_path = sample_dir / f"filtered_reads_{marker}.fastq.gz"
@@ -231,7 +211,7 @@ def main():
 
     active_markers = [m.strip().upper() for m in args.markers.split(",")]
 
-    vsearch_path = check_vsearch()
+    vsearch_path = find_tool("vsearch")
 
     input_dir = Path(args.input_dir)
     out_dir = Path(args.output_dir)
@@ -270,9 +250,17 @@ def main():
 
         # 3. Chimera detection on centroids
         with timer(f"{marker} - Chimera detection") as t:
-            _, chimeras_file = remove_chimeras(temp_dir, marker, vsearch_path)
+            consensus_clean, chimeras_file = remove_chimeras(temp_dir, marker, vsearch_path)
             chimera_ids = load_chimera_ids(chimeras_file)
         timings[f"{marker}_chimera"] = t.elapsed
+
+        # Count total consensus OTUs for chimera stats
+        consensus_file = temp_dir / f"consensus_{marker}.fasta"
+        total_consensus = sum(1 for l in open(consensus_file) if l.startswith('>'))
+        n_chimeras = len(chimera_ids)
+        n_clean = sum(1 for l in open(consensus_clean) if l.startswith('>'))
+        pct = 100 * n_chimeras / total_consensus if total_consensus else 0
+        print(f"  Chimeras: {n_chimeras:,}/{total_consensus:,} ({pct:.1f}%) removed, {n_clean:,} clean OTUs retained")
 
         # 4. Parse Output (skip chimeric OTUs)
         final_assignment = out_dir / f"global_otu_assignment_{marker}.txt"
@@ -283,7 +271,7 @@ def main():
         timings[f"{marker}_parse"] = t.elapsed
 
         all_otus[marker] = num_otus
-        print(f"✓ {marker} OTU assignment file: {final_assignment}")
+        print(f"[OK] {marker} OTU assignment file: {final_assignment}")
     
     # Merge all marker assignments into one file
     print(f"\n{'='*60}")

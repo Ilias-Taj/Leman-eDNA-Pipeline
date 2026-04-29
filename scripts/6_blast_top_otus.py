@@ -153,7 +153,8 @@ def main():
         print(f"Error loading matrix: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # 3. Extract Sequences from FASTA using robust mapping
+    # 3. Extract sequences from FASTA for top OTUs (only ~10, no indexing needed)
+
     sequences = {}
     for otu_id in top_ids:
         seq, found_id = get_sequence_for_otu(args.fasta, otu_id, otu_to_reads)
@@ -161,7 +162,7 @@ def main():
             sequences[otu_id] = seq
             print(f"  > Loaded sequence for {otu_id} ({len(seq)} bp from {found_id[:20]}...)")
         else:
-            print(f"  ⚠ Could not find sequence for {otu_id}", file=sys.stderr)
+            print(f"  [WARN] Could not find sequence for {otu_id}", file=sys.stderr)
 
     # 4. Run Remote BLAST
     print("\nStarting Remote BLAST (This takes 1-2 minutes per sequence)...")
@@ -227,7 +228,7 @@ def main():
                 print(result_line, end="")
                 out_f.write(result_line)
     
-    print(f"\n✓ Results saved to: {output_file}")
+    print(f"\n[OK] Results saved to: {output_file}")
 
 if __name__ == "__main__":
     main()

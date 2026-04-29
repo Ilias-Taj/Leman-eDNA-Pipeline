@@ -108,7 +108,7 @@ def main():
                 # List comprehension ensures columns align with header
                 counts = [str(otu_counts[marker][otu].get(bc, 0)) for bc in all_barcodes]
                 f.write(f"{otu}," + ",".join(counts) + "\n")
-        print(f"  ✓ Saved raw counts: {matrix_file.name}")
+        print(f"  [OK] Saved raw counts: {matrix_file.name}")
         
         # 2. Write Relative Abundance Matrix
         rel_matrix_file = merged_dir / f"otu_relative_abundance_{marker}.csv"
@@ -137,7 +137,7 @@ def main():
                     rel_counts.append(f"{norm_val:.6f}")
                 
                 f.write(f"{otu}," + ",".join(rel_counts) + "\n")
-        print(f"  ✓ Saved relative abundance: {rel_matrix_file.name}")
+        print(f"  [OK] Saved relative abundance: {rel_matrix_file.name}")
     
     print(f"\nSuccess. Matrices saved in: {merged_dir}")
 

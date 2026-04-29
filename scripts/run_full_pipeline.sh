@@ -186,6 +186,9 @@ log_message "Processing all ${#samples[@]} samples with full timing and resource
 update_progress "Processing all ${#samples[@]} samples..."
 echo ""
 
+# ── Per-barcode preprocessing loop ──────────────────────────────────────────
+# Each barcode directory contains one or more FASTQ chunks from MinION.
+# We concatenate them and run quality filtering (filtlong) per sample.
 for sample in "${samples[@]}"; do
   echo
   echo "========== Processing: $sample =========="
@@ -226,20 +229,20 @@ for sample in "${samples[@]}"; do
   export PATH="$ENV_PREFIX/bin:/opt/homebrew/bin:$PATH"
   if ! "$ENV_PREFIX/bin/python3" scripts/1_run_preprocessing.py --input_files "$sample_dir"/*.fastq.gz --output_dir "$outdir" --min_mean_q "$MIN_MEAN_Q" >> "$logf" 2>&1; then
     echo "Preprocessing failed for $sample (see $logf). Continuing to next sample." | tee -a "$logf"
-    log_message "✗ Preprocessing FAILED for $sample"
+    log_message "[FAIL] Preprocessing FAILED for $sample"
     update_progress "[PREPROC] FAILED $sample"
     continue
   fi
   step_end=$(date +%s)
   preproc_time=$((step_end - step_start))
   echo "[TIMING] $sample - Preprocessing: ${preproc_time}s" | tee -a "$logf"
-  log_message "✓ Preprocessing complete for $sample (${preproc_time}s)"
+  log_message "[OK] Preprocessing complete for $sample (${preproc_time}s)"
   update_progress "[PREPROC] Complete $sample (${preproc_time}s)"
 
   filtered="$outdir/filtered_reads.fastq.gz"
   if [ ! -f "$filtered" ]; then
     echo "Filtered file not found for $sample; skipping" | tee -a "$logf"
-    log_message "✗ Filtered file not found for $sample"
+    log_message "[FAIL] Filtered file not found for $sample"
     update_progress "[PREPROC] No output for $sample"
     continue
   fi
@@ -264,7 +267,9 @@ echo "GLOBAL MARKER CLASSIFICATION & CLUSTERING"
 echo "======================================="
 echo ""
 
-# Step 2: Classify reads by marker (18S vs COI)
+# ── Global pipeline steps (operate on all barcodes together) ────────────────
+
+# Step 2: Classify reads by marker based on amplicon length
 echo "[2/7] Classifying reads by marker..."
 log_message ""
 log_message "======================================="
@@ -278,15 +283,15 @@ if ! "$ENV_PREFIX/bin/python3" scripts/2_classify_markers.py \
     --input_dir "$OUTPUT_ROOT" \
     --markers "$MARKERS" > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
   echo "Marker classification failed (see $OUTPUT_ROOT/logs/marker_classification.log)" >&2
-  log_message "✗ Marker classification FAILED"
+  log_message "[FAIL] Marker classification FAILED"
   exit 1
 fi
 marker_end=$(date +%s)
 marker_mem_end=$(get_memory_usage)
 marker_time=$((marker_end - marker_start))
 marker_mem_delta=$((marker_mem_end - marker_mem_start))
-echo "✓ Marker classification complete (${marker_time}s, ${marker_mem_delta}MB memory)"
-log_message "✓ Marker classification complete (${marker_time}s, ${marker_mem_delta}MB memory)"
+echo "[OK] Marker classification complete (${marker_time}s, ${marker_mem_delta}MB memory)"
+log_message "[OK] Marker classification complete (${marker_time}s, ${marker_mem_delta}MB memory)"
 update_progress "[MARKER] Complete (${marker_time}s)"
 echo ""
 
@@ -304,15 +309,15 @@ if ! "$ENV_PREFIX/bin/python3" scripts/3_run_clustering_by_marker.py \
     --threads "$THREADS" \
     --markers "$MARKERS" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
   echo "Global clustering failed (see $OUTPUT_ROOT/logs/global_clustering.log)" >&2
-  log_message "✗ Global clustering FAILED"
+  log_message "[FAIL] Global clustering FAILED"
   exit 1
 fi
 cluster_end=$(date +%s)
 cluster_mem_end=$(get_memory_usage)
 cluster_time=$((cluster_end - cluster_start))
 cluster_mem_delta=$((cluster_mem_end - cluster_mem_start))
-echo "✓ Global clustering complete (${cluster_time}s, ${cluster_mem_delta}MB memory)"
-log_message "✓ Global clustering complete (${cluster_time}s, ${cluster_mem_delta}MB memory)"
+echo "[OK] Global clustering complete (${cluster_time}s, ${cluster_mem_delta}MB memory)"
+log_message "[OK] Global clustering complete (${cluster_time}s, ${cluster_mem_delta}MB memory)"
 update_progress "[CLUSTERING] Complete (${cluster_time}s)"
 echo ""
 
@@ -326,15 +331,15 @@ if ! "$ENV_PREFIX/bin/python3" scripts/4_merge_otu_tables_by_marker.py \
     --input_dir "$OUTPUT_ROOT" \
     --markers "$MARKERS" > "$OUTPUT_ROOT/logs/abundance_matrices.log" 2>&1; then
   echo "Matrix generation failed (see $OUTPUT_ROOT/logs/abundance_matrices.log)" >&2
-  log_message "✗ Matrix generation FAILED"
+  log_message "[FAIL] Matrix generation FAILED"
   exit 1
 fi
 matrix_end=$(date +%s)
 matrix_mem_end=$(get_memory_usage)
 matrix_time=$((matrix_end - matrix_start))
 matrix_mem_delta=$((matrix_mem_end - matrix_mem_start))
-echo "✓ Abundance matrices complete (${matrix_time}s, ${matrix_mem_delta}MB memory)"
-log_message "✓ Abundance matrices complete (${matrix_time}s, ${matrix_mem_delta}MB memory)"
+echo "[OK] Abundance matrices complete (${matrix_time}s, ${matrix_mem_delta}MB memory)"
+log_message "[OK] Abundance matrices complete (${matrix_time}s, ${matrix_mem_delta}MB memory)"
 update_progress "[MATRICES] Complete (${matrix_time}s)"
 echo ""
 
@@ -346,6 +351,8 @@ taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
 
 # ── Resolve database paths ──
+# These functions map short DB names (pr2, silva, midori2, ekoi, porter)
+# to actual .udb file paths. Called once per marker to build TAXONOMY_DB_ARGS.
 resolve_18s_db() {
   local choice="$1"
   if [ -n "$choice" ]; then
@@ -402,14 +409,14 @@ done
 
 if [ -z "$TAXONOMY_DB_ARGS" ]; then
   echo "WARNING: No reference databases found for active markers ($MARKERS). Skipping taxonomy." >&2
-  log_message "⚠ No databases found, skipping taxonomy assignment"
+  log_message "[WARN] No databases found, skipping taxonomy assignment"
 else
   if ! "$ENV_PREFIX/bin/python3" scripts/5_assign_taxonomy.py \
       --input_dir "$OUTPUT_ROOT" \
       $TAXONOMY_DB_ARGS \
       --threads "$THREADS" > "$OUTPUT_ROOT/logs/taxonomy_assignment.log" 2>&1; then
     echo "Taxonomy assignment failed (see $OUTPUT_ROOT/logs/taxonomy_assignment.log)" >&2
-    log_message "✗ Taxonomy assignment FAILED"
+    log_message "[FAIL] Taxonomy assignment FAILED"
     exit 1
   fi
 fi
@@ -417,8 +424,8 @@ taxonomy_end=$(date +%s)
 taxonomy_mem_end=$(get_memory_usage)
 taxonomy_time=$((taxonomy_end - taxonomy_start))
 taxonomy_mem_delta=$((taxonomy_mem_end - taxonomy_mem_start))
-echo "✓ Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_mem_delta}MB memory)"
-log_message "✓ Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_mem_delta}MB memory)"
+echo "[OK] Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_mem_delta}MB memory)"
+log_message "[OK] Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_mem_delta}MB memory)"
 update_progress "[TAXONOMY] Complete (${taxonomy_time}s)"
 echo ""
 
@@ -440,11 +447,11 @@ for bm in "${BLAST_MARKERS[@]}"; do
         --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
         --marker "$bm" \
         --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
-      echo "  ✓ ${bm} BLAST complete"
-      log_message "  ✓ ${bm} BLAST complete"
+      echo "  [OK] ${bm} BLAST complete"
+      log_message "  [OK] ${bm} BLAST complete"
     else
-      echo "  ⚠ ${bm} BLAST failed (non-critical, continuing...)"
-      log_message "  ⚠ ${bm} BLAST failed (non-critical, continuing...)"
+      echo "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
+      log_message "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
     fi
   fi
 done
@@ -452,8 +459,8 @@ blast_end=$(date +%s)
 blast_mem_end=$(get_memory_usage)
 blast_time=$((blast_end - blast_start))
 blast_mem_delta=$((blast_mem_end - blast_mem_start))
-echo "✓ BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
-log_message "✓ BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
 update_progress "[BLAST] Complete (${blast_time}s)"
 echo ""
 
@@ -469,15 +476,15 @@ if ! "$ENV_PREFIX/bin/python3" scripts/7_comprehensive_taxonomy_summary.py \
     $TAXONOMY_DB_ARGS \
     --skip_blast > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
   echo "Taxonomy summary failed (see $OUTPUT_ROOT/logs/taxonomy_summary.log)" >&2
-  log_message "✗ Taxonomy summary FAILED"
+  log_message "[FAIL] Taxonomy summary FAILED"
   exit 1
 fi
 summary_end=$(date +%s)
 summary_mem_end=$(get_memory_usage)
 summary_time=$((summary_end - summary_start))
 summary_mem_delta=$((summary_mem_end - summary_mem_start))
-echo "✓ Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
-log_message "✓ Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
+echo "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
+log_message "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
 update_progress "[SUMMARY] Complete (${summary_time}s)"
 echo ""
 
@@ -556,13 +563,13 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   echo "PERFORMANCE NOTES"
   echo "======================================="
   if [ $((cluster_time * 100 / total_time)) -gt 50 ]; then
-    echo "⚠️  Global clustering is the bottleneck (>50% of runtime)"
+    echo "[WARN]  Global clustering is the bottleneck (>50% of runtime)"
     echo "    Consider: reducing identity threshold or increasing threads"
   elif [ $((total_preproc * 100 / total_time)) -gt 50 ]; then
-    echo "⚠️  Preprocessing is the bottleneck (>50% of runtime)"
+    echo "[WARN]  Preprocessing is the bottleneck (>50% of runtime)"
     echo "    Consider: adjusting quality thresholds"
   else
-    echo "✓ Well-balanced resource usage across all pipeline steps"
+    echo "[OK] Well-balanced resource usage across all pipeline steps"
   fi
   
   echo ""

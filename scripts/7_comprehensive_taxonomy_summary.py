@@ -33,8 +33,9 @@ import time
 from pathlib import Path
 import re
 
+# Ensure scripts/ is on the import path so utils.py can be found from any working directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from db_tag import derive_tag
+from db_tag import label_from_path
 
 def load_otu_to_centroid_mapping(otu_assignment_file):
     """Load mapping from OTU IDs to centroid IDs."""
@@ -92,7 +93,9 @@ def parse_silva_taxonomy(taxonomy_file):
             if len(parts) < 2:
                 continue
             
-            # Extract centroid ID from header
+            # Extract centroid UUID from VSEARCH header.
+            # Headers look like: centroid=UUID|barcode|marker;size=N
+            # We need just the UUID to join with OTU assignment table.
             header = parts[0].split(';')[0]
             match = re.search(r'centroid=([a-f0-9\-]+)', header)
             if match:
@@ -187,8 +190,7 @@ def detect_db_prefix(db_path, marker):
     Falls back to 'SILVA' for 18S/JEDI (rRNA), 'eKOI' for COI if no path provided.
     """
     if db_path:
-        from pathlib import Path as P
-        name = P(db_path).stem.lower()
+        name = Path(db_path).stem.lower()
         if 'silva' in name:
             return "SILVA"
         elif 'midori' in name:
@@ -217,29 +219,18 @@ def main():
     parser.add_argument("--db_JEDI", default=None, help="Path to JEDI database (for prefix detection)")
     parser.add_argument("--tag", default=None,
                         help="Subfolder name under taxonomy/ and taxonomy_summary/ "
-                             "(e.g. 'silva-midori2'). Auto-derived from DB filenames "
+                             "(e.g. 'silva'). Auto-derived from DB filenames "
                              "if omitted. Must match the tag used for script 5.")
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
 
-    # Derive DB tag; per-DB subfolders let multiple databases coexist.
-    tag = args.tag or derive_tag([args.db_18S, args.db_COI, args.db_JEDI])
-    # Prefer tagged taxonomy/ subfolder; fall back to flat legacy layout if absent.
-    tagged_tax_dir = input_dir / "taxonomy" / tag
-    legacy_tax_dir = input_dir / "taxonomy"
-    if tagged_tax_dir.exists():
-        taxonomy_dir_in = tagged_tax_dir
-    elif any(legacy_tax_dir.glob("taxonomy_*.txt")):
-        taxonomy_dir_in = legacy_tax_dir
-        print(f"[tag] No tagged folder found, using legacy: {legacy_tax_dir}")
-    else:
-        taxonomy_dir_in = tagged_tax_dir  # will error later with clear message
-    output_dir = input_dir / "taxonomy_summary" / tag
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[tag] DB tag: {tag}")
-    print(f"[tag] Reading taxonomy from: {taxonomy_dir_in}")
-    print(f"[tag] Writing summary to:    {output_dir}")
+    # Per-marker DB labels: taxonomy/{MARKER}/{db_label}/ layout
+    db_labels = {}
+    for mname, db_path in [("18S", args.db_18S), ("COI", args.db_COI), ("JEDI", args.db_JEDI)]:
+        if db_path:
+            db_labels[mname] = args.tag or label_from_path(db_path)
+    print(f"[tag] Per-marker DB labels: {db_labels}")
     
     # Determine markers to process
     if args.markers:
@@ -249,10 +240,11 @@ def main():
         merged_dir = input_dir / "merged"
         markers_to_process = []
         for candidate in ["18S", "COI", "JEDI"]:
-            if (merged_dir / f"otu_relative_abundance_{candidate}.csv").exists():
+            if candidate in db_labels and (merged_dir / f"otu_relative_abundance_{candidate}.csv").exists():
                 markers_to_process.append(candidate)
         if not markers_to_process:
-            markers_to_process = ["18S", "COI"]
+            print("ERROR: no markers to process (no matching DB + abundance file)", file=sys.stderr)
+            sys.exit(1)
     
     print("=" * 80)
     print("COMPREHENSIVE TAXONOMY SUMMARY")
@@ -266,13 +258,18 @@ def main():
         
         # File paths
         abundance_file = input_dir / f"merged/otu_relative_abundance_{marker}.csv"
+        db_label = db_labels.get(marker)
+        if not db_label:
+            print(f"  [SKIP] No database provided for {marker}")
+            continue
+        taxonomy_dir_in = input_dir / "taxonomy" / marker / db_label
         taxonomy_file = taxonomy_dir_in / f"taxonomy_{marker}.txt"
         consensus_file = input_dir / f"temp_clustering/consensus_{marker}_clean.fasta"
         otu_assignment_file = input_dir / f"global_otu_assignment_{marker}.txt"
         
         # Check files exist
         if not abundance_file.exists():
-            print(f"  ⚠ Abundance file not found: {abundance_file}")
+            print(f"  [WARN] Abundance file not found: {abundance_file}")
             continue
         
         # 1. Load abundance data
@@ -297,7 +294,7 @@ def main():
             silva_taxonomy = parse_silva_taxonomy(taxonomy_file)
             print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (all confidence levels)")
         else:
-            print(f"  ⚠ Taxonomy file not found")
+            print(f"  [WARN] Taxonomy file not found")
         
         # 4. Run BLAST if requested
         blast_results = {}
@@ -372,9 +369,11 @@ def main():
         summary_df = pd.DataFrame(summary_rows)
         
         # Save to CSV
+        output_dir = input_dir / "taxonomy_summary" / marker / db_label
+        output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / f"comprehensive_taxonomy_{marker}.csv"
         summary_df.to_csv(output_file, index=False)
-        print(f"\n✓ Saved: {output_file}")
+        print(f"\n[OK] Saved: {output_file}")
         print(f"  {len(summary_df)} OTUs with taxonomy and abundance data")
         
         # Print summary statistics
@@ -388,7 +387,8 @@ def main():
     
     print("\n" + "=" * 80)
     print("COMPREHENSIVE TAXONOMY SUMMARY COMPLETE")
-    print(f"Output directory: {output_dir}")
+    for m, lab in db_labels.items():
+        print(f"  taxonomy_summary/{m}/{lab}/comprehensive_taxonomy_{m}.csv")
     print("=" * 80)
 
 if __name__ == "__main__":
