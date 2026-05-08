@@ -153,6 +153,11 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
     out_dir.mkdir(parents=True, exist_ok=True)
     out_fasta = out_dir / f"{marker}.fasta"
 
+    # Use cached ref file if it already exists (DB rarely changes between runs)
+    if out_fasta.exists() and out_fasta.stat().st_size > 0:
+        print(f"  [REF] Using cached {marker} references: {out_fasta}")
+        return out_fasta
+
     if length_range is None:
         length_range = MARKER_RANGES.get(marker, (0, 99999))
     lo, hi = length_range
@@ -168,18 +173,35 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
     sequences = []
 
     if suffix == ".udb":
-        tmp_fasta = out_dir / f"{marker}_raw_tmp.fasta"
-        # --topn is not a valid option for udb2fasta in vsearch >=2.22
-        # Extract the full DB then subsample after length filtering
-        cmd = [vsearch_path, "--udb2fasta", str(db_path),
-               "--output", str(tmp_fasta), "--quiet"]
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            print(f"  [WARN] vsearch udb2fasta failed for {marker}: "
-                  f"{res.stderr[:200]}", file=sys.stderr)
+        # Stream udb2fasta output through a pipe to avoid writing hundreds of
+        # thousands of sequences to disk before length filtering.
+        import subprocess as _sp
+        proc = _sp.Popen(
+            [vsearch_path, "--udb2fasta", str(db_path),
+             "--output", "-", "--quiet"],
+            stdout=_sp.PIPE, stderr=_sp.PIPE, text=True,
+        )
+        sequences = []
+        hdr, seq = "", ""
+        for line in proc.stdout:
+            line = line.rstrip("\n")
+            if line.startswith(">"):
+                if hdr and lo <= len(seq) <= hi:
+                    sequences.append((hdr, seq))
+                    if len(sequences) >= n_refs * 20:  # keep a generous pool
+                        break
+                hdr, seq = line[1:], ""
+            else:
+                seq += line
+        if hdr and lo <= len(seq) <= hi:
+            sequences.append((hdr, seq))
+        proc.stdout.close()
+        proc.wait()
+        if proc.returncode not in (0, None) and not sequences:
+            err = proc.stderr.read()[:200] if proc.stderr else ""
+            print(f"  [WARN] vsearch udb2fasta failed for {marker}: {err}",
+                  file=sys.stderr)
             return None
-        sequences = _read_fasta_sequences(tmp_fasta)
-        tmp_fasta.unlink(missing_ok=True)
 
     elif name_lower.endswith(".fasta.gz") or name_lower.endswith(".fa.gz"):
         sequences = _read_fasta_sequences_gz(db_path)
@@ -216,7 +238,7 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
 # ── minimap2 classification ───────────────────────────────────────────────────
 
 def classify_reads_minimap2(fastq_gz, refs_per_marker, minimap2_path,
-                             temp_dir, active_markers):
+                             temp_dir, active_markers, threads=4):
     """Classify reads via minimap2 against combined marker reference sequences.
 
     Reference headers must start with '{marker}_' (written by
@@ -251,7 +273,8 @@ def classify_reads_minimap2(fastq_gz, refs_per_marker, minimap2_path,
         return {}
 
     paf_file = temp_dir / "minimap2_classification.paf"
-    cmd = [minimap2_path, "-x", "map-ont", "-c", "--secondary=no",
+    cmd = [minimap2_path, "-x", "map-ont", "--secondary=no",
+           "--no-long-join", "-t", str(threads),
            str(combined_refs), str(fastq_gz)]
 
     with open(paf_file, "w") as paf_out:
@@ -322,7 +345,7 @@ def process_barcode(barcode_dir, active_markers,
         try:
             minimap2_classifications = classify_reads_minimap2(
                 filtered_reads, refs_per_marker, minimap2_path,
-                barcode_dir, active_markers,
+                barcode_dir, active_markers, threads=threads,
             )
             if minimap2_classifications:
                 print(f"  [minimap2] {barcode_name}: "
