@@ -93,15 +93,12 @@ def parse_silva_taxonomy(taxonomy_file):
             if len(parts) < 2:
                 continue
             
-            # Extract centroid UUID from VSEARCH header.
-            # Headers look like: centroid=UUID|barcode|marker;size=N
-            # We need just the UUID to join with OTU assignment table.
-            header = parts[0].split(';')[0]
-            match = re.search(r'centroid=([a-f0-9\-]+)', header)
-            if match:
-                centroid_id = match.group(1)
-            else:
-                centroid_id = header.split('|')[0].strip()
+            # Extract OTU ID from VSEARCH/SINTAX header.
+            # With isONclust3 pipeline headers look like: centroid=OTU_18S_000001;seqs=N
+            # With old VSEARCH pipeline headers look like: centroid=UUID|barcode|marker;size=N
+            raw_header = parts[0].split(';')[0]  # strip ;seqs=N or ;size=N
+            raw_header = raw_header.replace('centroid=', '').split('|')[0].strip()
+            centroid_id = raw_header  # OTU_18S_000001 or UUID
             full_taxonomy = parts[1] if len(parts) > 1 else ""
             
             tax_dict = {'domain': '', 'phylum': '', 'class': '', 'order': '', 
@@ -340,10 +337,13 @@ def main():
             
             # Add taxonomy (SILVA/PR2 for 18S and JEDI, MIDORI/eKOI for COI)
             # All levels stored with confidence — filtering done in notebooks
-            centroid_id = otu_to_centroid.get(otu_id, '')
+            # With isONclust3, OTU ID is the SINTAX query ID directly.
+            # Fall back to centroid UUID lookup for old VSEARCH-based runs.
             tax_levels = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
-            if centroid_id in silva_taxonomy:
-                tax = silva_taxonomy[centroid_id]
+            centroid_id = otu_to_centroid.get(otu_id, '')
+            tax_key = otu_id if otu_id in silva_taxonomy else centroid_id
+            if tax_key in silva_taxonomy:
+                tax = silva_taxonomy[tax_key]
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = tax.get(level.lower(), '')
                     row[f'{db_prefix}_{level}_Conf'] = tax.get(f'{level.lower()}_conf', '')
