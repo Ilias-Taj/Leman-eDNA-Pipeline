@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 # run_full_pipeline.sh
-# Full eDNA metabarcoding pipeline: quality filtering → marker classification → clustering + chimera detection → abundance matrices
+# Full eDNA metabarcoding pipeline: quality filtering ÔåÆ marker classification ÔåÆ clustering + chimera detection ÔåÆ abundance matrices
 # Processes already basecalled & demultiplexed FASTQ files.
 # Writes per-sample logs to out/logs/<sample>.log and produces outputs under out/<sample>/
 
@@ -13,8 +13,11 @@ MIN_READS=20
 MAPQ=20 # MAPQ threshold for grouping reads
 KEEP_PERCENT=100
 MIN_LENGTH=0
-MIN_MEAN_Q=20
+MIN_MEAN_Q=15
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
+USE_MINIMAP2=true
+ISONCLUST3_PATH="./tools/isONclust3/target/release/isONclust3"
+MINIMAP2_PATH="./tools/minimap2-2.30_x64-linux/minimap2"
 
 # Database overrides (empty = auto-detect from refs/)
 DB_18S=""   # e.g. silva, pr2, or path to .udb
@@ -49,6 +52,9 @@ Options:
   --db_18S DB        18S database: pr2 (default), silva, or path to .udb
   --db_COI DB        COI database: midori2 (default), ekoi, porter, or path to .udb
   --db_JEDI DB       JEDI database: pr2 (default), silva, or path to .udb
+  --isonclust3 PATH  Path to isONclust3 binary (default: tools/isONclust3/...)
+  --minimap2 PATH    Path to minimap2 binary (default: tools/minimap2-...)
+  --use_minimap2     Enable minimap2-based marker classification (default: true)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -90,6 +96,9 @@ while [[ $# -gt 0 ]]; do
     --db_18S) DB_18S="$2"; shift 2;;
     --db_COI) DB_COI="$2"; shift 2;;
     --db_JEDI) DB_JEDI="$2"; shift 2;;
+    --isonclust3) ISONCLUST3_PATH="$2"; shift 2;;
+    --minimap2) MINIMAP2_PATH="$2"; shift 2;;
+    --use_minimap2) USE_MINIMAP2=true; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -186,7 +195,7 @@ log_message "Processing all ${#samples[@]} samples with full timing and resource
 update_progress "Processing all ${#samples[@]} samples..."
 echo ""
 
-# ── Per-barcode preprocessing loop ──────────────────────────────────────────
+# ÔöÇÔöÇ Per-barcode preprocessing loop ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 # Each barcode directory contains one or more FASTQ chunks from MinION.
 # We concatenate them and run quality filtering (filtlong) per sample.
 for sample in "${samples[@]}"; do
@@ -256,8 +265,8 @@ for sample in "${samples[@]}"; do
   preproc_times+=($preproc_time)
   total_times+=($sample_total)
 
-  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB → ${filtered_reads_mb}MB)" | tee -a "$logf"
-  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB → ${filtered_reads_mb}MB)"
+  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB ÔåÆ ${filtered_reads_mb}MB)" | tee -a "$logf"
+  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB ÔåÆ ${filtered_reads_mb}MB)"
   echo "Finished preprocessing: $sample" | tee -a "$logf"
 done
 
@@ -267,7 +276,7 @@ echo "GLOBAL MARKER CLASSIFICATION & CLUSTERING"
 echo "======================================="
 echo ""
 
-# ── Global pipeline steps (operate on all barcodes together) ────────────────
+# ÔöÇÔöÇ Global pipeline steps (operate on all barcodes together) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 # Step 2: Classify reads by marker based on amplicon length
 echo "[2/7] Classifying reads by marker..."
@@ -279,9 +288,18 @@ log_message "[2/7] Classifying reads by marker..."
 update_progress "[MARKER] Starting marker classification..."
 marker_start=$(date +%s)
 marker_mem_start=$(get_memory_usage)
+_MM2_ARGS=""
+if [ "${USE_MINIMAP2:-false}" = "true" ]; then
+  _MM2_ARGS="--use_minimap2 --refs_dir refs/"
+  [ -n "$DB_18S" ]  && _MM2_ARGS="$_MM2_ARGS --db_18S $DB_18S"
+  [ -n "$DB_COI" ]  && _MM2_ARGS="$_MM2_ARGS --db_COI $DB_COI"
+  [ -n "$DB_JEDI" ] && _MM2_ARGS="$_MM2_ARGS --db_JEDI $DB_JEDI"
+fi
+# shellcheck disable=SC2086
 if ! "$ENV_PREFIX/bin/python3" scripts/2_classify_markers.py \
     --input_dir "$OUTPUT_ROOT" \
-    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
+    --markers "$MARKERS" \
+    $_MM2_ARGS > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
   echo "Marker classification failed (see $OUTPUT_ROOT/logs/marker_classification.log)" >&2
   log_message "[FAIL] Marker classification FAILED"
   exit 1
@@ -305,9 +323,9 @@ export PATH="$ENV_PREFIX/bin:/opt/homebrew/bin:$PATH"
 if ! "$ENV_PREFIX/bin/python3" scripts/3_run_clustering_by_marker.py \
     --input_dir "$OUTPUT_ROOT" \
     --output_dir "$OUTPUT_ROOT" \
-    --identity 0.95 \
     --threads "$THREADS" \
-    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
+    --markers "$MARKERS" \
+    --isonclust3 "$ISONCLUST3_PATH" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
   echo "Global clustering failed (see $OUTPUT_ROOT/logs/global_clustering.log)" >&2
   log_message "[FAIL] Global clustering FAILED"
   exit 1
@@ -350,7 +368,7 @@ update_progress "[TAXONOMY] Starting taxonomy assignment..."
 taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
 
-# ── Resolve database paths ──
+# ÔöÇÔöÇ Resolve database paths ÔöÇÔöÇ
 # These functions map short DB names (pr2, silva, midori2, ekoi, porter)
 # to actual .udb file paths. Called once per marker to build TAXONOMY_DB_ARGS.
 resolve_18s_db() {

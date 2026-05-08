@@ -2,7 +2,7 @@
 """Shared utilities for the eDNA pipeline scripts.
 
 Centralises common functions used across multiple pipeline steps:
-- Tool discovery (vsearch, filtlong)
+- Tool discovery (vsearch, filtlong, isONclust3, minimap2)
 - FASTQ I/O helpers
 - Directory traversal helpers
 - Timing context manager
@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 from typing import Generator, Optional, Tuple
 
+
 # ── Constants ────────────────────────────────────────────────────────────────
 
 # Directories created by the pipeline that should be skipped when iterating
@@ -21,6 +22,7 @@ from typing import Generator, Optional, Tuple
 SKIP_DIRS = frozenset({
     "logs", "validation", "merged", "temp_clustering",
     "taxonomy", "taxonomy_summary", "blast_results",
+    "isonclust_18S", "isonclust_COI", "isonclust_JEDI",
 })
 
 
@@ -65,6 +67,22 @@ def find_vsearch() -> str:
     return find_tool("vsearch")
 
 
+def find_isonclust3() -> str:
+    """Locate isONclust3 binary, checking the bundled tools/ path first."""
+    return find_tool(
+        "isONclust3",
+        extra_candidates=["./tools/isONclust3/target/release/isONclust3"],
+    )
+
+
+def find_minimap2() -> str:
+    """Locate minimap2 binary, checking the bundled tools/ path first."""
+    return find_tool(
+        "minimap2",
+        extra_candidates=["./tools/minimap2-2.30_x64-linux/minimap2"],
+    )
+
+
 # ── FASTQ helpers ────────────────────────────────────────────────────────────
 
 def iter_fastq(fileobj) -> Generator[Tuple[str, str, str, str], None, None]:
@@ -92,6 +110,9 @@ def iter_fastq(fileobj) -> Generator[Tuple[str, str, str, str], None, None]:
 def iter_barcode_dirs(input_dir: Path):
     """Yield sorted barcode directories, skipping pipeline output folders.
 
+    Also skips any directory whose name starts with 'isonclust_' to avoid
+    treating isONclust3 working directories as barcode samples.
+
     Args:
         input_dir: Root run directory (e.g. out/Water_eDNA_18S_COI_14_01_26).
 
@@ -99,7 +120,9 @@ def iter_barcode_dirs(input_dir: Path):
         Path objects for each sample/barcode subdirectory.
     """
     for d in sorted(input_dir.iterdir()):
-        if d.is_dir() and d.name not in SKIP_DIRS:
+        if (d.is_dir()
+                and d.name not in SKIP_DIRS
+                and not d.name.startswith("isonclust_")):
             yield d
 
 
