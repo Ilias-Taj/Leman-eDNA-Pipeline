@@ -169,8 +169,10 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
 
     if suffix == ".udb":
         tmp_fasta = out_dir / f"{marker}_raw_tmp.fasta"
+        # --topn is not a valid option for udb2fasta in vsearch >=2.22
+        # Extract the full DB then subsample after length filtering
         cmd = [vsearch_path, "--udb2fasta", str(db_path),
-               "--output", str(tmp_fasta), "--topn", "1000"]
+               "--output", str(tmp_fasta), "--quiet"]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             print(f"  [WARN] vsearch udb2fasta failed for {marker}: "
