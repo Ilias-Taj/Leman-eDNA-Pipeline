@@ -130,7 +130,6 @@ def run_isonclust3(input_fastq, working_dir, marker, min_cluster_size,
         "--outfolder", str(outfolder),
         "--n",        str(min_cluster_size),
         "--seeding",  "minimizer",
-        "--threads",  str(threads),
     ]
 
     print(f"Running isONclust3 for {marker}: {' '.join(cmd)}")
@@ -153,139 +152,78 @@ def run_isonclust3(input_fastq, working_dir, marker, min_cluster_size,
 
 def generate_consensus_from_clusters(isonclust_out_dir, working_dir, marker,
                                      vsearch_path, min_cluster_size=2):
-    """Generate per-OTU consensus sequences from isONclust3 cluster FASTQ files.
+    """Generate per-OTU representative sequences from isONclust3 cluster FASTQ files.
 
-    For each cluster:
-      - Converts cluster FASTQ to FASTA
-      - Runs vsearch --cluster_fast at 80 % identity to produce a consensus
-      - Writes >centroid={OTU_id};seqs={n_reads} to the output FASTA
+    Iterates directly over the per-cluster FASTQ files in fastq_files/.
+    For each cluster, picks the longest read as the OTU representative —
+    longer reads are more likely to span the full amplicon.
+
+    NOTE: The TSV cluster IDs do NOT map 1-to-1 to fastq file numbers
+    (isONclust3 renumbers clusters internally), so the TSV is only used for
+    the read->cluster assignment in parse_isonclust_to_assignment, not here.
 
     Args:
         isonclust_out_dir: Path to the clustering/ directory returned by
-                           run_isonclust3 (contains final_clusters.tsv and
-                           fastq_files/).
+                           run_isonclust3 (contains fastq_files/).
         working_dir:       temp_clustering/ directory for output files.
         marker:            Marker name (18S, COI, JEDI).
-        vsearch_path:      Path to vsearch executable.
+        vsearch_path:      Unused — kept for API compatibility with chimera step.
         min_cluster_size:  Skip clusters with fewer reads than this.
 
     Returns:
-        Tuple (consensus_fasta_path, cluster_to_otu_dict) where
-        cluster_to_otu_dict maps isONclust3 cluster_id -> OTU ID string.
+        Tuple (consensus_fasta_path, read_to_otu_dict) where read_to_otu_dict
+        maps each read_id to the OTU_id of its cluster.
     """
     isonclust_out_dir = Path(isonclust_out_dir)
     working_dir       = Path(working_dir)
 
-    clusters_tsv = isonclust_out_dir / "final_clusters.tsv"
-    if not clusters_tsv.exists():
-        print(f"ERROR: {clusters_tsv} not found", file=sys.stderr)
+    fastq_dir = isonclust_out_dir / "fastq_files"
+    if not fastq_dir.exists():
+        print(f"ERROR: fastq_files dir not found: {fastq_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Parse cluster_id -> [read_ids]
-    cluster_reads = {}
-    with open(clusters_tsv, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split("\t")
-            if len(parts) < 2:
-                continue
-            cid, rid = parts[0], parts[1]
-            cluster_reads.setdefault(cid, []).append(rid)
+    # Collect all per-cluster FASTQ files and sort numerically
+    fastq_files = sorted(fastq_dir.glob("*.fastq"),
+                         key=lambda p: int(p.stem) if p.stem.isdigit() else p.stem)
 
-    def _sort_key(x):
-        try:
-            return int(x)
-        except ValueError:
-            return x
-
-    sorted_ids = sorted(cluster_reads.keys(), key=_sort_key)
-    fastq_dir  = isonclust_out_dir / "fastq_files"
     consensus_fasta = working_dir / f"consensus_{marker}.fasta"
-
-    cluster_to_otu = {}
-    otu_counter    = 0
-    total_seqs     = 0
+    read_to_otu     = {}   # {read_id: otu_id} for all reads in kept clusters
+    otu_counter     = 0
+    total_seqs      = 0
 
     with open(consensus_fasta, "w") as out_f:
-        for cluster_id in sorted_ids:
-            read_ids = cluster_reads[cluster_id]
-            n_reads  = len(read_ids)
+        for fq_path in fastq_files:
+            # Parse all reads from this cluster FASTQ (4-line format)
+            reads = []  # list of (read_id, seq) tuples
+            with open(fq_path, "r") as fq_in:
+                buf = []
+                for line in fq_in:
+                    buf.append(line.rstrip("\n"))
+                    if len(buf) == 4:
+                        reads.append((buf[0][1:], buf[1]))  # strip '@'
+                        buf = []
 
+            n_reads = len(reads)
             if n_reads < min_cluster_size:
                 continue
 
-            cluster_fastq = fastq_dir / f"{cluster_id}.fastq"
-            if not cluster_fastq.exists():
-                continue
+            # Pick the longest read as OTU representative (most likely full-length)
+            rep_read_id, rep_seq = max(reads, key=lambda r: len(r[1]))
 
             otu_counter += 1
             otu_id = f"OTU_{marker}_{otu_counter:06d}"
-            cluster_to_otu[cluster_id] = otu_id
 
-            # Convert cluster FASTQ -> FASTA (simple 4-line parser)
-            tmp_fasta = working_dir / f"_tmp_cluster_{cluster_id}.fasta"
-            with open(tmp_fasta, "w") as fa_out:
-                with open(cluster_fastq, "r") as fq_in:
-                    buf = []
-                    for line in fq_in:
-                        buf.append(line.rstrip("\n"))
-                        if len(buf) == 4:
-                            fa_out.write(f">{buf[0][1:]}\n{buf[1]}\n")
-                            buf = []
+            for read_id, _ in reads:
+                read_to_otu[read_id] = otu_id
 
-            if n_reads == 1:
-                # Single-read cluster (shouldn't occur with min_cluster_size=2)
-                with open(tmp_fasta, "r") as f_in:
-                    lines_list = [l.rstrip("\n") for l in f_in]
-                if len(lines_list) >= 2:
-                    out_f.write(
-                        f">centroid={otu_id};seqs={n_reads}\n"
-                        f"{lines_list[1]}\n"
-                    )
-                    total_seqs += 1
-                tmp_fasta.unlink(missing_ok=True)
-                continue
-
-            # Run vsearch to get a consensus of reads within the cluster
-            tmp_cons = working_dir / f"_tmp_cons_{cluster_id}.fasta"
-            cmd = [
-                vsearch_path,
-                "--cluster_fast", str(tmp_fasta),
-                "--id",           "0.80",
-                "--consout",      str(tmp_cons),
-                "--minseqlength", "100",
-                "--quiet",
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            tmp_fasta.unlink(missing_ok=True)
-
-            if res.returncode != 0 or not tmp_cons.exists():
-                continue
-
-            # Take only the first consensus sequence
-            with open(tmp_cons, "r") as cons_in:
-                found_seq = False
-                for line in cons_in:
-                    if line.startswith(">"):
-                        found_seq = True
-                        continue
-                    if found_seq and line.strip():
-                        out_f.write(
-                            f">centroid={otu_id};seqs={n_reads}\n"
-                            f"{line.strip()}\n"
-                        )
-                        total_seqs += 1
-                        break
-
-            tmp_cons.unlink(missing_ok=True)
+            out_f.write(f">centroid={otu_id};seqs={n_reads}\n{rep_seq}\n")
+            total_seqs += 1
 
     print(
-        f"Generated {total_seqs} {marker} consensus sequences "
-        f"from {len(cluster_reads)} isONclust3 clusters"
+        f"Generated {total_seqs} {marker} representative sequences "
+        f"from {len(fastq_files)} isONclust3 cluster files"
     )
-    return consensus_fasta, cluster_to_otu
+    return consensus_fasta, read_to_otu
 
 
 # ── Assignment generation ─────────────────────────────────────────────────────
@@ -294,61 +232,46 @@ def parse_isonclust_to_assignment(isonclust_out_dir, output_file, marker,
                                    cluster_to_otu, chimera_ids=None):
     """Write a per-read OTU assignment file from isONclust3 clusters.
 
-    Reads final_clusters.tsv and maps each read to its OTU using the
-    cluster_to_otu dict produced by generate_consensus_from_clusters.
-    Chimeric OTUs are excluded.
-
-    Output format (one line per read):
-        {uuid}  {OTU_id}  {barcode}  {marker}
+    Uses the read_to_otu dict (produced by generate_consensus_from_clusters)
+    to map each read directly to its OTU without relying on TSV cluster IDs
+    (which do not match fastq file numbers in isONclust3 output).
 
     Args:
-        isonclust_out_dir: clustering/ directory from run_isonclust3.
+        isonclust_out_dir: clustering/ directory from run_isonclust3 (unused,
+                           kept for API compatibility).
         output_file:       Destination .txt file.
         marker:            Marker name.
-        cluster_to_otu:    dict {cluster_id -> OTU_id} (from
-                           generate_consensus_from_clusters).
+        cluster_to_otu:    dict {read_id -> OTU_id} returned by
+                           generate_consensus_from_clusters.
         chimera_ids:       Set of OTU IDs identified as chimeric.
     """
-    isonclust_out_dir = Path(isonclust_out_dir)
-    chimera_ids       = chimera_ids or set()
-    clusters_tsv      = isonclust_out_dir / "final_clusters.tsv"
+    chimera_ids = chimera_ids or set()
+    read_to_otu = cluster_to_otu   # renamed arg for clarity
 
     written_count = 0
     with open(output_file, "w") as f_out:
-        with open(clusters_tsv, "r") as f_in:
-            for line in f_in:
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split("\t")
-                if len(parts) < 2:
-                    continue
-                cluster_id, read_full_id = parts[0], parts[1]
+        for read_full_id, otu_id in read_to_otu.items():
+            if otu_id in chimera_ids:
+                continue
 
-                otu_id = cluster_to_otu.get(cluster_id)
-                if otu_id is None:
-                    continue  # cluster filtered (too small or missing fastq)
-                if otu_id in chimera_ids:
-                    continue  # chimeric OTU
+            # Parse read ID: {uuid}|{barcode}|{marker}
+            id_parts = read_full_id.split("|")
+            if len(id_parts) < 3:
+                continue
+            uuid    = id_parts[0]
+            barcode = id_parts[1]
+            m       = id_parts[2]
 
-                # Parse read ID: {uuid}|{barcode}|{marker}
-                id_parts = read_full_id.split("|")
-                if len(id_parts) < 3:
-                    continue
-                uuid    = id_parts[0]
-                barcode = id_parts[1]
-                m       = id_parts[2]
+            f_out.write(f"{uuid}\t{otu_id}\t{barcode}\t{m}\n")
+            written_count += 1
 
-                f_out.write(f"{uuid}\t{otu_id}\t{barcode}\t{m}\n")
-                written_count += 1
-
-    n_otus = len(set(cluster_to_otu.values()))
+    n_otus = len(set(otu_id for otu_id in read_to_otu.values()
+                     if otu_id not in chimera_ids))
     print(
         f"Generated assignments for {n_otus} {marker} OTUs, "
         f"wrote {written_count} assignments."
     )
     return n_otus
-
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
