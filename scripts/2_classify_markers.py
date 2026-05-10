@@ -513,7 +513,7 @@ def main():
             use_minimap2=args.use_minimap2,
             refs_per_marker=refs_per_marker,
             minimap2_path=minimap2_path,
-            threads=args.threads,
+            threads=4,
         )
         if result:
             results.append(result)
