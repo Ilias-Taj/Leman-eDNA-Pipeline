@@ -325,7 +325,8 @@ def classify_read(seq, read_id, active_markers):
 # ── Per-barcode processing ────────────────────────────────────────────────────
 
 def process_barcode(barcode_dir, active_markers,
-                    use_minimap2=False, refs_per_marker=None, minimap2_path=None):
+                    use_minimap2=False, refs_per_marker=None, minimap2_path=None,
+                    threads=4):
     """Split filtered_reads.fastq.gz into per-marker FASTQ files.
 
     Uses minimap2 as the primary classifier (when requested) and falls back
@@ -512,6 +513,7 @@ def main():
             use_minimap2=args.use_minimap2,
             refs_per_marker=refs_per_marker,
             minimap2_path=minimap2_path,
+            threads=args.threads,
         )
         if result:
             results.append(result)
