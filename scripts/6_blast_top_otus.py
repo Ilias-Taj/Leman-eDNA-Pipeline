@@ -11,21 +11,23 @@ checking multiple candidate reads until finding one that matches the FASTA file.
 Prerequisite: Run 4_merge_otu_tables_by_marker.py first
 
 Usage:
-    # BLAST top 10 COI OTUs
+    # BLAST top 10 COI OTUs by abundance (default)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_COI.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_COI_clean.fasta \
         --otu_assignment out/Water_eDNA_18S_COI_14_01_26/global_otu_assignment_COI.txt \
         --marker COI \
         --top_n 10
-    
-    # BLAST top 10 18S OTUs
+
+    # BLAST top 10 18S OTUs by lowest SINTAX confidence (to check pipeline performance)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_18S.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_18S_clean.fasta \
         --otu_assignment out/Water_eDNA_18S_COI_14_01_26/global_otu_assignment.txt \
         --marker 18S \
-        --top_n 10
+        --top_n 10 \
+        --select_by confidence \
+        --taxonomy_summary out/Water_eDNA_18S_COI_14_01_26/taxonomy_summary/18S/pr2/comprehensive_taxonomy_18S.csv
 
 Output:
     Results are saved to {output_dir}/blast_top{N}_{marker}.txt
@@ -116,11 +118,21 @@ def main():
                         help="Path to global OTU assignment file for OTU-to-centroid mapping")
     parser.add_argument("--marker", required=True, 
                         help="Marker name (18S or COI)")
-    parser.add_argument("--top_n", type=int, default=10, 
-                        help="Number of top abundant OTUs to BLAST (default: 10)")
-    parser.add_argument("--output_dir", default=None, 
+    parser.add_argument("--top_n", type=int, default=10,
+                        help="Number of OTUs to BLAST (default: 10)")
+    parser.add_argument("--select_by", choices=["abundance", "confidence"], default="abundance",
+                        help="Selection criterion: 'abundance' (most reads) or 'confidence' "
+                             "(lowest SINTAX species-level confidence — most uncertain calls, "
+                             "best for checking pipeline performance). Default: abundance.")
+    parser.add_argument("--taxonomy_summary", default=None,
+                        help="Path to comprehensive_taxonomy_*.csv (required when --select_by confidence)")
+    parser.add_argument("--output_dir", default=None,
                         help="Output directory for results (default: {input_dir}/blast_results/)")
     args = parser.parse_args()
+
+    if args.select_by == "confidence" and not args.taxonomy_summary:
+        print("ERROR: --taxonomy_summary is required when using --select_by confidence", file=sys.stderr)
+        sys.exit(1)
 
     # Set up output directory
     if args.output_dir:
@@ -139,19 +151,34 @@ def main():
     otu_to_reads = load_otu_mapping_robust(args.otu_assignment)
     print(f"  Loaded {len(otu_to_reads)} OTU mappings")
 
-    # 2. Load Matrix and find Top OTUs
+    # 2. Load Matrix and select Top OTUs
     try:
         df = pd.read_csv(args.matrix, index_col=0)
-        # Sum all sample columns
         df['total_reads'] = df.sum(axis=1)
-        
-        # Sort and take top N
-        top_otus = df.sort_values('total_reads', ascending=False).head(args.top_n)
+
+        if args.select_by == "confidence":
+            # Load taxonomy summary to get species-level confidence scores
+            tax = pd.read_csv(args.taxonomy_summary, index_col=0)
+            conf_col = next((c for c in tax.columns if c.endswith('_Species_Conf')), None)
+            if conf_col is None:
+                print("ERROR: No *_Species_Conf column found in taxonomy summary", file=sys.stderr)
+                sys.exit(1)
+            # Join confidence onto abundance df; keep only OTUs with assigned taxonomy
+            df = df.join(tax[[conf_col, 'Total_Abundance']], how='left')
+            df = df[df[conf_col].notna()]
+            # Sort by confidence ascending (lowest confidence = most uncertain = most useful to check)
+            top_otus = df.sort_values(conf_col, ascending=True).head(args.top_n)
+            print(f"Selected Top {args.top_n} OTUs by lowest {conf_col} "
+                  f"(range {top_otus[conf_col].min():.2f}–{top_otus[conf_col].max():.2f}) "
+                  f"from {len(df)} assigned OTUs.")
+        else:
+            # Default: top N by total read abundance
+            top_otus = df.sort_values('total_reads', ascending=False).head(args.top_n)
+            print(f"Selected Top {args.top_n} OTUs by abundance from {len(df)} total.")
+
         top_ids = list(top_otus.index)
-        
-        print(f"Identified Top {args.top_n} OTUs (from {len(df)} total).")
     except Exception as e:
-        print(f"Error loading matrix: {e}", file=sys.stderr)
+        print(f"Error loading matrix/taxonomy: {e}", file=sys.stderr)
         sys.exit(1)
 
     # 3. Extract sequences from FASTA for top OTUs (only ~10, no indexing needed)

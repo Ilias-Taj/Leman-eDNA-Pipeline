@@ -16,6 +16,7 @@ MIN_LENGTH=0
 MIN_MEAN_Q=15
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
 USE_MINIMAP2=true
+SKIP_TRIMMING=false
 ISONCLUST3_PATH="./tools/isONclust3/target/release/isONclust3"
 MINIMAP2_PATH="./tools/minimap2-2.30_x64-linux/minimap2"
 
@@ -55,6 +56,7 @@ Options:
   --isonclust3 PATH  Path to isONclust3 binary (default: tools/isONclust3/...)
   --minimap2 PATH    Path to minimap2 binary (default: tools/minimap2-...)
   --use_minimap2     Enable minimap2-based marker classification (default: true)
+  --skip_trimming    Skip primer trimming step 2b (default: false)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -99,6 +101,7 @@ while [[ $# -gt 0 ]]; do
     --isonclust3) ISONCLUST3_PATH="$2"; shift 2;;
     --minimap2) MINIMAP2_PATH="$2"; shift 2;;
     --use_minimap2) USE_MINIMAP2=true; shift;;
+    --skip_trimming) SKIP_TRIMMING=true; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -313,6 +316,29 @@ log_message "[OK] Marker classification complete (${marker_time}s, ${marker_mem_
 update_progress "[MARKER] Complete (${marker_time}s)"
 echo ""
 
+# Step 2b: Trim primer sequences using Porechop ABI (ab initio detection)
+echo "[2b/7] Trimming primer sequences (Porechop ABI)..."
+log_message "[2b/7] Trimming primer sequences..."
+update_progress "[TRIM] Starting primer trimming..."
+trim_start=$(date +%s)
+trim_mem_start=$(get_memory_usage)
+_TRIM_SKIP_ARG=""
+[ "${SKIP_TRIMMING:-false}" = "true" ] && _TRIM_SKIP_ARG="--skip"
+if ! "$ENV_PREFIX/bin/python3" scripts/2b_trim_primers.py \
+    --input_dir "$OUTPUT_ROOT" \
+    --markers "$MARKERS" \
+    --threads "$THREADS" \
+    $_TRIM_SKIP_ARG > "$OUTPUT_ROOT/logs/primer_trimming.log" 2>&1; then
+  echo "[WARN] Primer trimming step encountered errors (see $OUTPUT_ROOT/logs/primer_trimming.log) — continuing."
+  log_message "[WARN] Primer trimming had errors (non-fatal, continuing)"
+fi
+trim_end=$(date +%s)
+trim_time=$((trim_end - trim_start))
+echo "[OK] Primer trimming complete (${trim_time}s)"
+log_message "[OK] Primer trimming complete (${trim_time}s)"
+update_progress "[TRIM] Complete (${trim_time}s)"
+echo ""
+
 # Step 3: Run clustering separately for each marker
 echo "[3/7] Running global OTU clustering..."
 log_message "[3/7] Running global OTU clustering..."
@@ -459,12 +485,19 @@ for bm in "${BLAST_MARKERS[@]}"; do
   if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
     echo "  BLASTing top 10 ${bm} OTUs..."
     log_message "  BLASTing top 10 ${bm} OTUs..."
+    # Find the taxonomy summary CSV for this marker (lowest-confidence selection)
+    _tax_csv=$(find "$OUTPUT_ROOT/taxonomy_summary/${bm}" -name "comprehensive_taxonomy_${bm}.csv" 2>/dev/null | head -1)
+    _conf_args=""
+    if [ -n "$_tax_csv" ]; then
+      _conf_args="--select_by confidence --taxonomy_summary $_tax_csv"
+    fi
     if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
         --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
         --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
         --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
         --marker "$bm" \
-        --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
+        --top_n 10 \
+        ${_conf_args} > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
       echo "  [OK] ${bm} BLAST complete"
       log_message "  [OK] ${bm} BLAST complete"
     else
