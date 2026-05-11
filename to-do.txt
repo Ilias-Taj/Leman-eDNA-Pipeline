@@ -91,3 +91,14 @@ KEY OBSERVATIONS
    - Document the new taxonomy/{MARKER}/{db}/ path structure
    - Add DB performance comparison table
    - Document how to add a new reference database
+
+
+Summary Reunion :
+
+Séquences coupés en 2.
+Filtrer les trop court et les trop long.
+Trimer les sequences.
+
+Fungel, 5%, separer les critères choisis pour sortir la confidence, aussi les amplicon coupé
+Beaucoup de chimeric
+Nombre de reads/50 = OTU

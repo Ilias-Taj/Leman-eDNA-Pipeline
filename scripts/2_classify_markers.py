@@ -238,7 +238,7 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
 # ── minimap2 classification ───────────────────────────────────────────────────
 
 def classify_reads_minimap2(fastq_gz, refs_per_marker, minimap2_path,
-                             temp_dir, active_markers, threads=4):
+                             temp_dir, active_markers, threads=8):
     """Classify reads via minimap2 against combined marker reference sequences.
 
     Reference headers must start with '{marker}_' (written by

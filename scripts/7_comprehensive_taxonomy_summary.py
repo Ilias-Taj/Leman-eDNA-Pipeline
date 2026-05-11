@@ -292,6 +292,7 @@ def main():
             print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (all confidence levels)")
         else:
             print(f"  [WARN] Taxonomy file not found")
+
         
         # 4. Run BLAST if requested
         blast_results = {}
@@ -354,6 +355,7 @@ def main():
                     row[f'{db_prefix}_{level}_Conf'] = ''
 
             
+
             # Add BLAST results if available
             if otu_id in blast_results:
                 row['NCBI_TopHit'] = blast_results[otu_id]['species']

@@ -33,6 +33,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import find_tool, find_isonclust3, timer, SKIP_DIRS
 
 
+
+# Optional: spoa POA consensus for better OTU representative sequences
+try:
+    import spoa as _spoa
+    _SPOA_AVAILABLE = True
+except ImportError:
+    _SPOA_AVAILABLE = False
+
+_SPOA_MAX_READS = 100  # max reads to use per cluster for POA (speed vs quality)
 # ── Chimera detection (UNCHANGED) ────────────────────────────────────────────
 
 def remove_chimeras(working_dir, marker, vsearch_path):
@@ -207,8 +216,19 @@ def generate_consensus_from_clusters(isonclust_out_dir, working_dir, marker,
             if n_reads < min_cluster_size:
                 continue
 
-            # Pick the longest read as OTU representative (most likely full-length)
-            rep_read_id, rep_seq = max(reads, key=lambda r: len(r[1]))
+            # Generate OTU representative: spoa POA consensus when available,
+            # otherwise fall back to the longest read.
+            if _SPOA_AVAILABLE and n_reads >= 3:
+                seqs = [seq for _, seq in reads]
+                if len(seqs) > _SPOA_MAX_READS:
+                    step = max(1, len(seqs) // _SPOA_MAX_READS)
+                    seqs = seqs[::step][:_SPOA_MAX_READS]
+                rep_seq, _ = _spoa.poa(seqs)
+                if not rep_seq:  # fallback if spoa returns empty
+                    _, rep_seq = max(reads, key=lambda r: len(r[1]))
+                rep_read_id = "spoa_consensus"
+            else:
+                rep_read_id, rep_seq = max(reads, key=lambda r: len(r[1]))
 
             otu_counter += 1
             otu_id = f"OTU_{marker}_{otu_counter:06d}"
