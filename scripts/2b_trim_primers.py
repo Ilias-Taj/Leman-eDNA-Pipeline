@@ -39,7 +39,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import find_tool
 
-RC_MAP = str.maketrans("ACGT", "TGCA")
+# Full IUPAC complement: handles degenerate bases Y, R, M, K, S, W, B, V, D, H, N
+RC_MAP = str.maketrans(
+    "ACGTRYMKSWBVDHNacgrtykmswbvdhn",
+    "TGCAYRKMSWVBHDNtgcayrkmswvbhdn")
 
 
 def rc(seq: str) -> str:
@@ -53,7 +56,7 @@ def rc(seq: str) -> str:
 DEFAULT_PRIMERS = {
     "18S":  {"fwd": "ACCTGGTTGATCCTGCCAGT",       "rev": "TGTTACGACTTCACCTTCCTCTAAA"},
     "COI":  {"fwd": "GGTCAACAAATCATAAAGATATTGG",  "rev": "TAAACTTCAGGGTGACCAAAAAATCA"},
-    "JEDI": {"fwd": "GGTCAACAAATCATAAAGATATTGG",  "rev": "TAAACTTCAGGGTGACCAAAAAATCA"},
+    "JEDI": {"fwd": "GTGYCAGCMGCCGCGGTAA",         "rev": "CCGYCAATTYMTTTRAGTTT"},    # 515F-Y / 926R
 }
 
 
