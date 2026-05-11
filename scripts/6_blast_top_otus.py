@@ -72,34 +72,35 @@ def load_otu_mapping_robust(otu_assignment_file):
 
 def get_sequence_for_otu(fasta_path, otu_id, otu_to_reads_map):
     """
-    Scans FASTA file to find a sequence matching one of the reads assigned to this OTU.
+    Scans FASTA file for a sequence matching this OTU.
+
+    Supports two FASTA header formats:
+      - isONclust3: >centroid=OTU_18S_000001;seqs=123  (OTU ID in header directly)
+      - VSEARCH:    >centroid=uuid|barcode|marker;size=100  (read UUID in header)
     Returns (sequence, found_id) or (None, None) if not found.
     """
-    if otu_id not in otu_to_reads_map:
-        return None, None
-    
-    candidates = otu_to_reads_map[otu_id]
-    
+    candidates = otu_to_reads_map.get(otu_id, set())
+
     with open(fasta_path, "r") as handle:
         for record in SeqIO.parse(handle, "fasta"):
-            # VSEARCH consensus headers look like: >centroid=uuid|barcode|marker;size=100
             header_clean = record.id.split(';')[0].replace('centroid=', '')
-            
-            # Try matching different parts:
-            # 1. Full ID match (uuid|barcode|marker)
+
+            # isONclust3: header IS the OTU ID (e.g. OTU_18S_000001)
+            if header_clean == otu_id:
+                return str(record.seq), header_clean
+
+            # VSEARCH fallback: header is a read UUID, match via otu_to_reads mapping
             if header_clean in candidates:
                 return str(record.seq), header_clean
-            
-            # 2. Just the UUID part (before first |)
+
             uuid_part = header_clean.split('|')[0]
             if uuid_part in candidates:
                 return str(record.seq), uuid_part
-            
-            # 3. Try any candidate that starts with this UUID
+
             for candidate in candidates:
                 if header_clean.startswith(candidate) or candidate.startswith(uuid_part):
                     return str(record.seq), header_clean
-    
+
     return None, None
 
 def main():
