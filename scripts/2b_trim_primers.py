@@ -50,43 +50,14 @@ from utils import find_tool
 
 # Full IUPAC complement table for rc()
 _IUPAC_COMP = str.maketrans(
-    "ACGTRYMKSWBVDHNacgtryMkswbvdhn",
-    "TGCAYRKMSWVBHDNtgcayrMkswvbhdn")
+    "ACGTRYMKSWBVDHNacgtrymkswbvdhn",
+    "TGCAYRKMSWVBHDNtgcayrkmswvbhdn")
 
 
 def rc(seq: str) -> str:
     """Reverse complement of a DNA sequence (handles IUPAC degenerate bases)."""
     return seq.translate(_IUPAC_COMP)[::-1]
 
-
-def iupac_to_regex(primer: str) -> re.Pattern:
-    """
-    Expand an IUPAC degenerate primer to a regex pattern.
-    Returns a compiled pattern for the primer alone (no leading/trailing context).
-    """
-    _map = {
-        "A": "A", "C": "C", "G": "G", "T": "T",
-        "R": "[AG]", "Y": "[CT]", "M": "[AC]", "K": "[GT]",
-        "S": "[CG]", "W": "[AT]", "B": "[CGT]", "V": "[ACG]",
-        "D": "[AGT]", "H": "[ACT]", "N": "[ACGT]",
-    }
-    return re.compile("".join(_map.get(b.upper(), b) for b in primer))
-
-
-def primer_in_region(region: str, pattern: re.Pattern, max_err_rate: float = 0.20) -> bool:
-    """
-    Check whether a primer pattern appears in *region* with up to max_err_rate
-    mismatches.  Uses exact regex first (fast), then a sliding-window Hamming
-    distance check for mismatches if the exact match fails.
-    """
-    if pattern.search(region):
-        return True
-
-    primer_str = pattern.pattern  # the raw (expanded) string — we use original
-    # Fall back to Hamming distance on each window of the region
-    # We need the original primer string (not the regex expansion) for this.
-    # We'll get it from the caller via a closure — see classify_read().
-    return False
 
 
 def hamming_match(region: str, primer: str, max_err_rate: float = 0.20) -> bool:

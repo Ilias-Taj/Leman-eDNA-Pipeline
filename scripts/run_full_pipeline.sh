@@ -316,8 +316,8 @@ log_message "[OK] Marker classification complete (${marker_time}s, ${marker_mem_
 update_progress "[MARKER] Complete (${marker_time}s)"
 echo ""
 
-# Step 2b: Trim primer sequences using Porechop ABI (ab initio detection)
-echo "[2b/7] Trimming primer sequences (Porechop ABI)..."
+# Step 2b: Primer reclassification + trimming (cutadapt)
+echo "[2b/7] Primer reclassification + trimming (cutadapt)..."
 log_message "[2b/7] Trimming primer sequences..."
 update_progress "[TRIM] Starting primer trimming..."
 trim_start=$(date +%s)
