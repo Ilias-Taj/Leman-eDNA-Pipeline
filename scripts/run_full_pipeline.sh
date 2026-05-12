@@ -473,46 +473,9 @@ log_message "[OK] Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_me
 update_progress "[TAXONOMY] Complete (${taxonomy_time}s)"
 echo ""
 
-# Step 6: BLAST validation (optional, top 10 OTUs per active marker)
-echo "[6/7] Running BLAST validation (top 10 OTUs)..."
-log_message "[6/7] Running BLAST validation (top 10 OTUs)..."
-update_progress "[BLAST] Starting BLAST validation..."
-blast_start=$(date +%s)
-blast_mem_start=$(get_memory_usage)
-
-IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
-for bm in "${BLAST_MARKERS[@]}"; do
-  if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
-    echo "  BLASTing top 10 ${bm} OTUs..."
-    log_message "  BLASTing top 10 ${bm} OTUs..."
-    # BLAST uses --select_by abundance (default). For confidence-based selection,
-    # re-run step 6 manually after step 7 has generated the taxonomy summary CSV.
-    if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
-        --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
-        --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
-        --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
-        --marker "$bm" \
-        --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
-      echo "  [OK] ${bm} BLAST complete"
-      log_message "  [OK] ${bm} BLAST complete"
-    else
-      echo "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
-      log_message "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
-    fi
-  fi
-done
-blast_end=$(date +%s)
-blast_mem_end=$(get_memory_usage)
-blast_time=$((blast_end - blast_start))
-blast_mem_delta=$((blast_mem_end - blast_mem_start))
-echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
-log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
-update_progress "[BLAST] Complete (${blast_time}s)"
-echo ""
-
-# Step 7: Comprehensive taxonomy summary
-echo "[7/7] Generating comprehensive taxonomy summary..."
-log_message "[7/7] Generating comprehensive taxonomy summary..."
+# Step 6: Comprehensive taxonomy summary (creates CSV with blank BLAST columns)
+echo "[6/7] Generating comprehensive taxonomy summary..."
+log_message "[6/7] Generating comprehensive taxonomy summary..."
 update_progress "[SUMMARY] Starting comprehensive summary..."
 summary_start=$(date +%s)
 summary_mem_start=$(get_memory_usage)
@@ -532,6 +495,49 @@ summary_mem_delta=$((summary_mem_end - summary_mem_start))
 echo "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
 log_message "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
 update_progress "[SUMMARY] Complete (${summary_time}s)"
+echo ""
+
+# Step 7: BLAST validation (optional, top 10 OTUs per active marker)
+# Now uses --select_by confidence since the summary CSV already exists.
+echo "[7/7] Running BLAST validation (top 10 OTUs)..."
+log_message "[7/7] Running BLAST validation (top 10 OTUs)..."
+update_progress "[BLAST] Starting BLAST validation..."
+blast_start=$(date +%s)
+blast_mem_start=$(get_memory_usage)
+
+IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
+for bm in "${BLAST_MARKERS[@]}"; do
+  if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
+    echo "  BLASTing top 10 ${bm} OTUs..."
+    log_message "  BLASTing top 10 ${bm} OTUs..."
+    # Find taxonomy summary CSV for --select_by confidence and --update_summary
+    _tax_csv=$(find "$OUTPUT_ROOT/taxonomy_summary/${bm}" -name "comprehensive_taxonomy_${bm}.csv" 2>/dev/null | head -1)
+    _blast_extra_args=""
+    if [ -n "$_tax_csv" ]; then
+      _blast_extra_args="--select_by confidence --taxonomy_summary $_tax_csv --update_summary $_tax_csv"
+    fi
+    if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
+        --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
+        --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
+        --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
+        --marker "$bm" \
+        --top_n 10 \
+        $_blast_extra_args > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
+      echo "  [OK] ${bm} BLAST complete"
+      log_message "  [OK] ${bm} BLAST complete"
+    else
+      echo "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
+      log_message "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
+    fi
+  fi
+done
+blast_end=$(date +%s)
+blast_mem_end=$(get_memory_usage)
+blast_time=$((blast_end - blast_start))
+blast_mem_delta=$((blast_mem_end - blast_mem_start))
+echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+update_progress "[BLAST] Complete (${blast_time}s)"
 echo ""
 
 echo ""
@@ -593,8 +599,8 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Global clustering" "$cluster_time" "$((cluster_time * 100 / total_time))" "$cluster_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Abundance matrices" "$matrix_time" "$((matrix_time * 100 / total_time))" "$matrix_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Taxonomy assignment" "$taxonomy_time" "$((taxonomy_time * 100 / total_time))" "$taxonomy_mem_delta"
-  printf "%-30s %10ds (%3d%%) %+8dMB\n" "BLAST validation" "$blast_time" "$((blast_time * 100 / total_time))" "$blast_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Comprehensive summary" "$summary_time" "$((summary_time * 100 / total_time))" "$summary_mem_delta"
+  printf "%-30s %10ds (%3d%%) %+8dMB\n" "BLAST validation" "$blast_time" "$((blast_time * 100 / total_time))" "$blast_mem_delta"
   echo "---------------------------------------"
   printf "%-30s %10ds (%3d%%)\n" "Total global steps" "$global_steps_time" "$((global_steps_time * 100 / total_time))"
   

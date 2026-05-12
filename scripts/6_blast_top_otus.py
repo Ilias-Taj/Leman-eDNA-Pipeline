@@ -155,6 +155,8 @@ def main():
                         help="Path to comprehensive_taxonomy_*.csv (required when --select_by confidence)")
     parser.add_argument("--output_dir", default=None,
                         help="Output directory for results (default: {input_dir}/blast_results/)")
+    parser.add_argument("--update_summary", default=None,
+                        help="Path to comprehensive_taxonomy CSV to update with BLAST results")
     args = parser.parse_args()
 
     if args.select_by == "confidence" and not args.taxonomy_summary:
@@ -221,6 +223,7 @@ def main():
 
     # 4. Run Remote BLAST
     print("\nStarting Remote BLAST (This takes 1-2 minutes per sequence)...")
+    blast_results = {}  # otu_id -> {species, identity, evalue}
     
     # Open output file for writing
     with open(output_file, 'w') as out_f:
@@ -263,6 +266,11 @@ def main():
                             species_name = " ".join(parts[0:3])
                     
                     ident = f"{100 * hsp.identities / hsp.align_length:.1f}%"
+                    blast_results[otu_id] = {
+                        "species": species_name,
+                        "identity": ident,
+                        "evalue": f"{hsp.expect:.2e}",
+                    }
                     print(f"done")
                     result_line = f"{otu_id:<20} | {count:<10.4f} | {species_name:<40} | {ident:<10} | {hsp.expect:.2e}\n"
                     print(result_line, end="")
@@ -289,6 +297,31 @@ def main():
                 out_f.write(result_line)
     
     print(f"\n[OK] Results saved to: {output_file}")
+
+    # 5. Optionally update the comprehensive taxonomy summary CSV
+    if args.update_summary and blast_results:
+        print(f"\nUpdating summary CSV: {args.update_summary}")
+        try:
+            df_summary = pd.read_csv(args.update_summary)
+            id_col = "OTU_ID" if "OTU_ID" in df_summary.columns else df_summary.columns[0]
+
+            for col in ["NCBI_TopHit", "NCBI_Identity", "NCBI_Evalue"]:
+                if col not in df_summary.columns:
+                    df_summary[col] = ""
+
+            updated = 0
+            for otu_id, result in blast_results.items():
+                mask = df_summary[id_col] == otu_id
+                if mask.any():
+                    df_summary.loc[mask, "NCBI_TopHit"] = result["species"]
+                    df_summary.loc[mask, "NCBI_Identity"] = result["identity"]
+                    df_summary.loc[mask, "NCBI_Evalue"] = result["evalue"]
+                    updated += 1
+
+            df_summary.to_csv(args.update_summary, index=False)
+            print(f"  Updated {updated} OTUs in summary CSV")
+        except Exception as e:
+            print(f"  [WARN] Failed to update summary CSV: {e}")
 
 if __name__ == "__main__":
     main()
