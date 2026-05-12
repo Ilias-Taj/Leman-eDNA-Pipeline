@@ -36,6 +36,15 @@ Output:
 Note:
     BLAST queries are rate-limited (3 seconds between queries) to comply
     with NCBI usage policies. Expect ~1-2 minutes per sequence.
+
+Changelog:
+    2026-05-12  Reorder: runs as step 7 (after summary). Adds --update_summary
+                to write BLAST results back into the comprehensive taxonomy CSV.
+                Add 5-min timeout per NCBI query (signal.alarm) to prevent hangs.
+                Change --select_by confidence to pick highest confidence OTUs
+                (validates best SINTAX calls against NCBI).
+    2026-05-11  Fix isONclust3 FASTA header support in get_sequence_for_otu().
+                Add --select_by confidence mode (reads taxonomy summary CSV).
 """
 
 import pandas as pd

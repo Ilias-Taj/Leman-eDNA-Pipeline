@@ -30,6 +30,9 @@ Usage:
     # Soil data (JEDI + COI) length-only
     python scripts/2_classify_markers.py \
         --input_dir out/Soil_eDNA_JEDI_COI_14_01_26 --markers JEDI,COI
+
+Changelog:
+    2026-05-12  Increase default threads from 4 to 8 for classify_reads_minimap2().
 """
 
 import argparse

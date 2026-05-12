@@ -3,6 +3,15 @@ set -eo pipefail
 # run_full_pipeline.sh
 # Full eDNA metabarcoding pipeline: quality filtering ÔåÆ marker classification ÔåÆ clustering + chimera detection ÔåÆ abundance matrices
 # Processes already basecalled & demultiplexed FASTQ files.
+# Changelog:
+#   2026-05-12  Reorder steps: summary (step 6) before BLAST (step 7)
+#               Summary CSV created with blank NCBI columns first,
+#               BLAST runs after and updates CSV via --update_summary.
+#               BLAST now uses --select_by confidence (highest SINTAX conf)
+#               since summary CSV exists before BLAST runs.
+#   2026-05-11  Replace Porechop ABI with cutadapt for primer trimming (step 2b).
+#               Add primer-based reclassification (Phase 1) before trimming.
+#               Fix stale "Porechop ABI" references in comments.
 # Writes per-sample logs to out/logs/<sample>.log and produces outputs under out/<sample>/
 
 # Default to the delivered eDNA run; override with --root if needed

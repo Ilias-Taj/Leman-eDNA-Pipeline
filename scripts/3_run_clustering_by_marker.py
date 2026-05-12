@@ -19,6 +19,11 @@ Output:
     - consensus_{marker}_clean.fasta  (chimera-filtered consensus sequences)
     - global_otu_assignment.txt       (read-to-OTU mapping across all markers)
     - global_otu_assignment_{marker}.txt  (per-marker assignment files)
+
+Changelog:
+    2026-05-12  Add optional spoa POA consensus for OTU representative sequences.
+                Falls back to longest-read method when spoa unavailable or
+                cluster has < 3 reads. Cap at 100 reads per consensus (_SPOA_MAX_READS).
 """
 
 import argparse

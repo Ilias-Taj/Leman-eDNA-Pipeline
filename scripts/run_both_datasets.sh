@@ -12,6 +12,10 @@ set -eo pipefail
 #     > out/logs/pipeline_combined.log 2>&1 &
 #   tail -f out/logs/pipeline_water.log
 
+# Changelog:
+#   2026-05-12  Refactor to accept CLI arguments (--db_18S, --db_COI, --db_JEDI,
+#               --threads, --water_root, --soil_root) instead of env vars.
+#               Add usage() help function.
 # ── Defaults ──────────────────────────────────────────────────
 DB_18S="pr2"
 DB_COI="porter"
