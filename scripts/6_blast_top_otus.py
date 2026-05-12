@@ -19,7 +19,7 @@ Usage:
         --marker COI \
         --top_n 10
 
-    # BLAST top 10 18S OTUs by lowest SINTAX confidence (to check pipeline performance)
+    # BLAST top 10 18S OTUs by highest SINTAX confidence (to validate pipeline performance)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_18S.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_18S_clean.fasta \
@@ -149,8 +149,8 @@ def main():
                         help="Number of OTUs to BLAST (default: 10)")
     parser.add_argument("--select_by", choices=["abundance", "confidence"], default="abundance",
                         help="Selection criterion: 'abundance' (most reads) or 'confidence' "
-                             "(lowest SINTAX species-level confidence — most uncertain calls, "
-                             "best for checking pipeline performance). Default: abundance.")
+                             "(highest SINTAX species-level confidence — best taxonomy calls, "
+                             "validates pipeline performance against NCBI). Default: abundance.")
     parser.add_argument("--taxonomy_summary", default=None,
                         help="Path to comprehensive_taxonomy_*.csv (required when --select_by confidence)")
     parser.add_argument("--output_dir", default=None,
@@ -195,9 +195,9 @@ def main():
             # Join confidence onto abundance df; keep only OTUs with assigned taxonomy
             df = df.join(tax[[conf_col, 'Total_Abundance']], how='left')
             df = df[df[conf_col].notna()]
-            # Sort by confidence ascending (lowest confidence = most uncertain = most useful to check)
-            top_otus = df.sort_values(conf_col, ascending=True).head(args.top_n)
-            print(f"Selected Top {args.top_n} OTUs by lowest {conf_col} "
+            # Sort by confidence descending (highest confidence = best calls to validate against NCBI)
+            top_otus = df.sort_values(conf_col, ascending=False).head(args.top_n)
+            print(f"Selected Top {args.top_n} OTUs by highest {conf_col} "
                   f"(range {top_otus[conf_col].min():.2f}–{top_otus[conf_col].max():.2f}) "
                   f"from {len(df)} assigned OTUs.")
         else:
