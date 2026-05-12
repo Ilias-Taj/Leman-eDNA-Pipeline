@@ -485,19 +485,14 @@ for bm in "${BLAST_MARKERS[@]}"; do
   if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
     echo "  BLASTing top 10 ${bm} OTUs..."
     log_message "  BLASTing top 10 ${bm} OTUs..."
-    # Find the taxonomy summary CSV for this marker (lowest-confidence selection)
-    _tax_csv=$(find "$OUTPUT_ROOT/taxonomy_summary/${bm}" -name "comprehensive_taxonomy_${bm}.csv" 2>/dev/null | head -1)
-    _conf_args=""
-    if [ -n "$_tax_csv" ]; then
-      _conf_args="--select_by confidence --taxonomy_summary $_tax_csv"
-    fi
+    # BLAST uses --select_by abundance (default). For confidence-based selection,
+    # re-run step 6 manually after step 7 has generated the taxonomy summary CSV.
     if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
         --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
         --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
         --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
         --marker "$bm" \
-        --top_n 10 \
-        ${_conf_args} > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
+        --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
       echo "  [OK] ${bm} BLAST complete"
       log_message "  [OK] ${bm} BLAST complete"
     else

@@ -44,7 +44,34 @@ from Bio import SeqIO
 import argparse
 import sys
 import time
+import signal
 from pathlib import Path
+
+
+
+class BlastTimeout(Exception):
+    """Raised when a BLAST query exceeds the allowed time."""
+    pass
+
+
+BLAST_TIMEOUT_SECONDS = 300  # 5 minutes per query
+
+
+def _run_blast_with_timeout(seq, timeout=BLAST_TIMEOUT_SECONDS):
+    """Run a single BLAST query with a timeout (Unix signal-based)."""
+    def _alarm_handler(signum, frame):
+        raise BlastTimeout(f"BLAST query timed out after {timeout}s")
+
+    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(timeout)
+    try:
+        result_handle = NCBIWWW.qblast("blastn", "nt", seq, hitlist_size=1)
+        blast_record = NCBIXML.read(result_handle)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return blast_record
 
 def load_otu_mapping_robust(otu_assignment_file):
     """
@@ -220,10 +247,9 @@ def main():
             seq = sequences[otu_id]
             
             try:
-                # BLASTN against 'nt' (Nucleotide collection)
+                # BLASTN against 'nt' (Nucleotide collection) with timeout
                 print(f"  BLASTing {otu_id}...", end=" ", flush=True)
-                result_handle = NCBIWWW.qblast("blastn", "nt", seq, hitlist_size=1)
-                blast_record = NCBIXML.read(result_handle)
+                blast_record = _run_blast_with_timeout(seq)
                 
                 if blast_record.alignments:
                     alignment = blast_record.alignments[0]
@@ -250,6 +276,12 @@ def main():
                 # Be polite to NCBI servers
                 time.sleep(3)
                 
+            except BlastTimeout:
+                print(f"TIMEOUT")
+                result_line = f"{otu_id:<20} | {count:<10.4f} | TIMEOUT                                 | -          | -\n"
+                print(result_line, end="")
+                out_f.write(result_line)
+
             except Exception as e:
                 print(f"error")
                 result_line = f"{otu_id:<20} | ERROR: {e}\n"
