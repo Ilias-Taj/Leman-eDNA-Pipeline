@@ -95,10 +95,5 @@ KEY OBSERVATIONS
 
 Summary Reunion :
 
-Séquences coupés en 2.
-Filtrer les trop court et les trop long.
-Trimer les sequences.
 
-Fungel, 5%, separer les critères choisis pour sortir la confidence, aussi les amplicon coupé
-Beaucoup de chimeric
-Nombre de reads/50 = OTU
+[ ] ASV mode for JEDI marker: paper (Priest et al. 2026, hal-05507468) recommends ASVs over OTUs for JEDI — OTUs at 97% underestimate diversity by ~50-55% due to species merging. Add VSEARCH --derep_fulllength + --cluster_unoise (ASV/denoising) mode in 3_run_clustering_by_marker.py for JEDI marker specifically. Also switch default JEDI database to SILVA (covers Bacteria+Archaea+Eukarya, unlike PR2 which is eukaryote-only).

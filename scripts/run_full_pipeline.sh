@@ -506,10 +506,9 @@ log_message "[OK] Comprehensive summary complete (${summary_time}s, ${summary_me
 update_progress "[SUMMARY] Complete (${summary_time}s)"
 echo ""
 
-# Step 7: BLAST validation (optional, top 10 OTUs per active marker)
-# Now uses --select_by confidence since the summary CSV already exists.
-echo "[7/7] Running BLAST validation (top 10 OTUs)..."
-log_message "[7/7] Running BLAST validation (top 10 OTUs)..."
+# Step 7: BLAST validation (top 10 by abundance + top 10 by confidence per marker)
+echo "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
+log_message "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
 update_progress "[BLAST] Starting BLAST validation..."
 blast_start=$(date +%s)
 blast_mem_start=$(get_memory_usage)
@@ -517,26 +516,38 @@ blast_mem_start=$(get_memory_usage)
 IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
 for bm in "${BLAST_MARKERS[@]}"; do
   if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
-    echo "  BLASTing top 10 ${bm} OTUs..."
-    log_message "  BLASTing top 10 ${bm} OTUs..."
-    # Find taxonomy summary CSV for --select_by confidence and --update_summary
     _tax_csv=$(find "$OUTPUT_ROOT/taxonomy_summary/${bm}" -name "comprehensive_taxonomy_${bm}.csv" 2>/dev/null | head -1)
-    _blast_extra_args=""
-    if [ -n "$_tax_csv" ]; then
-      _blast_extra_args="--select_by confidence --taxonomy_summary $_tax_csv --update_summary $_tax_csv"
-    fi
+
+    # Run 1: Top 10 by abundance
+    echo "  BLASTing top 10 ${bm} OTUs by abundance..."
+    log_message "  BLASTing top 10 ${bm} OTUs by abundance..."
     if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
         --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
         --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
         --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
-        --marker "$bm" \
-        --top_n 10 \
-        $_blast_extra_args > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
-      echo "  [OK] ${bm} BLAST complete"
-      log_message "  [OK] ${bm} BLAST complete"
+        --marker "$bm" --top_n 10 --select_by abundance \
+        ${_tax_csv:+--update_summary "$_tax_csv"} \
+        > "$OUTPUT_ROOT/logs/blast_abundance_${bm}.log" 2>&1; then
+      echo "  [OK] ${bm} abundance BLAST complete"
     else
-      echo "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
-      log_message "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
+      echo "  [WARN] ${bm} abundance BLAST failed (non-critical)"
+    fi
+
+    # Run 2: Top 10 by confidence (requires taxonomy summary)
+    if [ -n "$_tax_csv" ]; then
+      echo "  BLASTing top 10 ${bm} OTUs by confidence..."
+      log_message "  BLASTing top 10 ${bm} OTUs by confidence..."
+      if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
+          --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
+          --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
+          --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
+          --marker "$bm" --top_n 10 --select_by confidence \
+          --taxonomy_summary "$_tax_csv" --update_summary "$_tax_csv" \
+          > "$OUTPUT_ROOT/logs/blast_confidence_${bm}.log" 2>&1; then
+        echo "  [OK] ${bm} confidence BLAST complete"
+      else
+        echo "  [WARN] ${bm} confidence BLAST failed (non-critical)"
+      fi
     fi
   fi
 done
@@ -638,7 +649,7 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   echo "======================================="
   echo "Abundance matrices:    $OUTPUT_ROOT/merged/"
   echo "Taxonomy assignments:  $OUTPUT_ROOT/taxonomy/"
-  echo "BLAST validation:      $OUTPUT_ROOT/blast_results/"
+  echo "BLAST validation:      $OUTPUT_ROOT/blast_results/ (abundance + confidence)"
   echo "Summary CSV:           $OUTPUT_ROOT/taxonomy_summary/"
   echo "Logs:                  $OUTPUT_ROOT/logs/"
 fi

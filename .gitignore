@@ -32,3 +32,7 @@ __pycache__/
 Presentation_eDNA_Results.ipynb
 /presentation/
 *.pptx
+
+# Pre-built tools/binaries (download or build locally)
+/tools/isONclust3/
+/tools/minimap2-*/

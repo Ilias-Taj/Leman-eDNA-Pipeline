@@ -122,8 +122,8 @@ def classify_read(seq: str, primers: dict, search_len: int = 200,
 
 
 DEFAULT_PRIMERS = {
-    "18S":  {"fwd": "ACCTGGTTGATCCTGCCAGT",       "rev": "TGTTACGACTTCACCTTCCTCTAAA"},
-    "COI":  {"fwd": "GGTCAACAAATCATAAAGATATTGG",  "rev": "TAAACTTCAGGGTGACCAAAAATCA"},
+    "18S":  {"fwd": "AACCTGGTTGATCCTGCCAGT",      "rev": "CCTTGTTACGACTTCACCTTCC"},
+    "COI":  {"fwd": "GGTCAACAAATCATAAAGATATTGG",  "rev": "TAAACTTCAGGGTGACCAAAAAATCA"},
     "JEDI": {"fwd": "GTGYCAGCMGCCGCGGTAA",         "rev": "CCGYCAATTYMTTTRAGTTT"},
 }
 

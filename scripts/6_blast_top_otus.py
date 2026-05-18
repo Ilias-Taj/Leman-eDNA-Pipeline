@@ -2,8 +2,11 @@
 """
 6_blast_top_otus.py - BLAST TOP OTUs AGAINST NCBI (ROBUST VERSION)
 
-Extracts the top N most abundant OTUs from the abundance matrix
+Extracts the top N OTUs (by abundance or confidence) from the abundance matrix
 and runs remote BLAST searches against NCBI GenBank for taxonomy validation.
+
+Output filename includes the selection criterion:
+    blast_top{N}_{select_by}_{marker}.txt
 
 Robustly handles ID mapping from OTU names to consensus sequences by
 checking multiple candidate reads until finding one that matches the FASTA file.
@@ -19,7 +22,7 @@ Usage:
         --marker COI \
         --top_n 10
 
-    # BLAST top 10 18S OTUs by highest SINTAX confidence (to validate pipeline performance)
+    # BLAST top 10 18S OTUs by confidence (validates pipeline calls against NCBI)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_18S.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_18S_clean.fasta \
@@ -30,7 +33,7 @@ Usage:
         --taxonomy_summary out/Water_eDNA_18S_COI_14_01_26/taxonomy_summary/18S/pr2/comprehensive_taxonomy_18S.csv
 
 Output:
-    Results are saved to {output_dir}/blast_top{N}_{marker}.txt
+    Results are saved to {output_dir}/blast_top{N}_{select_by}_{marker}.txt
     Default output_dir: {input_dir}/blast_results/
 
 Note:
@@ -38,6 +41,8 @@ Note:
     with NCBI usage policies. Expect ~1-2 minutes per sequence.
 
 Changelog:
+    2026-05-13  Split BLAST into two runs: top 10 by abundance + top 10 by confidence.
+                Output filename now includes selection criterion (abundance/confidence).
     2026-05-12  Reorder: runs as step 7 (after summary). Adds --update_summary
                 to write BLAST results back into the comprehensive taxonomy CSV.
                 Add 5-min timeout per NCBI query (signal.alarm) to prevent hangs.
@@ -179,7 +184,7 @@ def main():
         output_dir = Path(args.matrix).parent.parent / "blast_results"
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    output_file = output_dir / f"blast_top{args.top_n}_{args.marker}.txt"
+    output_file = output_dir / f"blast_top{args.top_n}_{args.select_by}_{args.marker}.txt"
 
     print(f"--- BLASTing Top {args.top_n} {args.marker} OTUs ---")
     print(f"Results will be saved to: {output_file}")
