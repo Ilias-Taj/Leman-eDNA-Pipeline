@@ -1,39 +1,3 @@
-==========================================================================
-  Leman eDNA Pipeline — To-Do / Next Steps
-  Updated: 2025-04-29
-==========================================================================
-
-CURRENT RESULTS SUMMARY
-------------------------
-Water 18S: 38,828 clean OTUs
-  - PR2:   74.6% Phylum, 56.0% Genus, 49.5% Species (conf>=0.8) -- BEST
-  - SILVA:  41.4% Phylum, 25.1% Genus, 2.2% Species
-  -> 196 confident eukaryotic genera with PR2
-
-Water COI: 4,456 clean OTUs
-  - Porter: 14.9% Phylum, 12.2% Genus, 7.0% Species (conf>=0.8)
-  - eKOI:   20.0% Phylum, 1.6% Genus, 0.9% Species
-  - MIDORI2: ~13% flat (poor resolution)
-  -> 23 confident eukaryotic genera with Porter
-
-Soil JEDI: 12,413 clean OTUs
-  - PR2:   27.0% Phylum, 10.0% Genus, 10.0% Species (conf>=0.8)
-  - SILVA:  0.7% Phylum, 0.0% Genus (unusable for JEDI)
-  -> 10 confident eukaryotic genera with PR2
-
-Soil COI: 31,386 clean OTUs
-  - Porter: 1.3% Phylum, 0.1% Genus (very poor)
-  - eKOI:   14.5% Phylum, 0.1% Genus
-  -> Most soil COI remains unresolved at genus level
-
-KEY OBSERVATIONS
-  - PR2 is clearly the best DB for 18S and JEDI markers
-  - COI classification is weak across all DBs -- likely because
-    general-purpose COI DBs lack local freshwater/soil taxa coverage
-  - Soil COI has 31K OTUs but almost none resolve to genus
-  - Isospora (coccidian parasite) dominates 18S and JEDI -- real signal
-    or primer artifact? Needs verification.
-  - "Homo" in soil COI top genera = contamination (skin/breath DNA)
 
 ==========================================================================
   NEXT STEPS
@@ -76,14 +40,6 @@ KEY OBSERVATIONS
         - Cross-validate: do known Leman species appear?
 
      Tools needed: Biopython, rentrez (R), BOLD API, cd-hit, vsearch
-
-2. PRIMER-BASED MARKER CLASSIFICATION
-   Priority: MEDIUM -- improve marker targeting beyond read length
-   - Current marker assignment uses only read length thresholds
-   - Better approach: check primer sequences at read ends
-     * Forward/reverse primer match (fuzzy, allow 2-3 mismatches)
-     * Use cutadapt --discard-untrimmed to separate by primer
-   - Would resolve overlapping size ranges between 18S/COI/JEDI
 
 5. README UPDATES
    Priority: LOW
