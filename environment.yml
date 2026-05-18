@@ -6,22 +6,24 @@ channels:
 dependencies:
   # --- Python & Base Tools ---
   - python=3.10
-  - mamba       
+  - mamba
   - pip
   - unzip
-  
+
   # --- Bioinformatics Tools ---
   - filtlong              # Quality filtering for long reads
-  - vsearch               # Global sequence alignment clustering & SINTAX taxonomy
-  - samtools              # SAM/BAM file processing
-  
+  - vsearch              # Clustering, chimera detection, SINTAX taxonomy
+  - samtools             # SAM/BAM file processing
+  - cutadapt             # Primer trimming (step 2b)
+
   # --- Python Data Science Packages ---
-  - biopython             # For BLAST interface (script 6)
-  - pandas                # Data manipulation (scripts 4, 5, 7)
-  - matplotlib            # Plotting (notebook analysis)
-  - seaborn               # Statistical visualizations (notebook)
-  - ipykernel             # Jupyter notebook kernel
-  
+  - biopython            # BLAST interface (script 6)
+  - pandas               # Data manipulation (scripts 4, 5, 7)
+  - matplotlib           # Plotting (analysis notebooks)
+  - seaborn              # Statistical visualizations (notebooks)
+  - ipykernel            # Jupyter notebook kernel
+  - numpy               # Numerical operations
+
   # --- Pip Packages ---
-  - pip: 
+  - pip:
       - biopython
