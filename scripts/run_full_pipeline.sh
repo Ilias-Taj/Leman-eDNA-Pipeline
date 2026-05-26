@@ -26,6 +26,7 @@ MIN_MEAN_Q=15
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
 USE_MINIMAP2=true
 SKIP_TRIMMING=false
+SKIP_BLAST=false
 ISONCLUST3_PATH="./tools/isONclust3/target/release/isONclust3"
 MINIMAP2_PATH="./tools/minimap2-2.30_x64-linux/minimap2"
 
@@ -66,6 +67,7 @@ Options:
   --minimap2 PATH    Path to minimap2 binary (default: tools/minimap2-...)
   --use_minimap2     Enable minimap2-based marker classification (default: true)
   --skip_trimming    Skip primer trimming step 2b (default: false)
+  --skip_blast       Skip BLAST validation step 7 (default: false)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -111,6 +113,7 @@ while [[ $# -gt 0 ]]; do
     --minimap2) MINIMAP2_PATH="$2"; shift 2;;
     --use_minimap2) USE_MINIMAP2=true; shift;;
     --skip_trimming) SKIP_TRIMMING=true; shift;;
+    --skip_blast) SKIP_BLAST=true; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -507,6 +510,10 @@ update_progress "[SUMMARY] Complete (${summary_time}s)"
 echo ""
 
 # Step 7: BLAST validation (top 10 by abundance + top 10 by confidence per marker)
+if [ "${SKIP_BLAST:-false}" = "true" ]; then
+  echo "[7/7] Skipping BLAST validation (--skip_blast)"
+  log_message "[7/7] Skipping BLAST validation (--skip_blast)"
+else
 echo "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
 log_message "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
 update_progress "[BLAST] Starting BLAST validation..."
@@ -558,6 +565,7 @@ blast_mem_delta=$((blast_mem_end - blast_mem_start))
 echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
 log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
 update_progress "[BLAST] Complete (${blast_time}s)"
+fi
 echo ""
 
 echo ""

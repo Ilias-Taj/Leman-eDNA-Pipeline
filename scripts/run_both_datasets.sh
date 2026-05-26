@@ -21,6 +21,7 @@ DB_18S="pr2"
 DB_COI="porter"
 DB_JEDI="pr2"
 THREADS=14
+SKIP_BLAST=false
 WATER_ROOT="data/Water_eDNA_18S_COI_14_01_26/fastq_pass"
 SOIL_ROOT="data/Soil_eDNA_JEDI_COI_14_01_26/fastq_pass"
 
@@ -33,6 +34,7 @@ Options:
   --db_COI  DB     COI database: porter (default), midori2, ekoi, or path to .udb
   --db_JEDI DB     JEDI database: pr2 (default), silva, or path to .udb
   --threads N      Threads (default: $THREADS)
+  --skip_blast     Skip BLAST validation step (default: false)
   --water_root DIR Water fastq_pass directory (default: $WATER_ROOT)
   --soil_root  DIR Soil fastq_pass directory  (default: $SOIL_ROOT)
   -h, --help       Show this help
@@ -46,12 +48,15 @@ while [[ $# -gt 0 ]]; do
     --db_COI)  DB_COI="$2";  shift 2;;
     --db_JEDI) DB_JEDI="$2"; shift 2;;
     --threads) THREADS="$2"; shift 2;;
+    --skip_blast) SKIP_BLAST=true; shift;;
     --water_root) WATER_ROOT="$2"; shift 2;;
     --soil_root)  SOIL_ROOT="$2";  shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1"; usage; exit 1;;
   esac
 done
+
+[ "$SKIP_BLAST" = "true" ] && _SKIP_BLAST_ARG="--skip_blast" || _SKIP_BLAST_ARG=""
 
 mkdir -p out/logs
 WATER_LOG="out/logs/pipeline_water.log"
@@ -70,6 +75,7 @@ bash scripts/run_full_pipeline.sh \
   --threads "$THREADS" \
   --db_18S "$DB_18S" \
   --db_COI "$DB_COI" \
+  $_SKIP_BLAST_ARG \
   2>&1 | tee "$WATER_LOG"
 
 echo ""
@@ -91,6 +97,7 @@ bash scripts/run_full_pipeline.sh \
   --threads "$THREADS" \
   --db_JEDI "$DB_JEDI" \
   --db_COI "$DB_COI" \
+  $_SKIP_BLAST_ARG \
   2>&1 | tee "$SOIL_LOG"
 
 echo ""
