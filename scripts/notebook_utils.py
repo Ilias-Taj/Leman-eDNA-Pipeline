@@ -448,11 +448,10 @@ def plot_barcode_reads(base_path, markers, marker_colors=None):
             if not fq.exists():
                 fq = bd / f"filtered_reads_{marker}.fastq.gz"
             n = 0
-            if fq.exists():
+            if fq.exists() and fq.stat().st_size > 50:
                 with gzip.open(str(fq), 'rt') as f:
-                    for line_i, _ in enumerate(f):
-                        pass
-                    n = (line_i + 1) // 4
+                    line_count = sum(1 for _ in f)
+                n = line_count // 4
             counts.append(n)
         ax.bar(barcode_labels, counts, color=marker_colors.get(marker, '#333'))
         ax.set_title(f'{marker}: Reads per Barcode', fontweight='bold')
