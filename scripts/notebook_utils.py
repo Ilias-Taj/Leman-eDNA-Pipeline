@@ -281,24 +281,29 @@ def plot_read_lengths(base_path, markers, marker_colors=None):
                         if i % 4 == 1:
                             marker_lengths[marker].append(len(line.strip()))
 
-    fig, axes = plt.subplots(1, len(markers), figsize=(7*len(markers), 5))
+    fig, axes = plt.subplots(1, len(markers), figsize=(14, 5))
     if len(markers) == 1:
         axes = [axes]
     for i, marker in enumerate(markers):
         ax = axes[i]
         lengths = marker_lengths[marker]
         if lengths:
-            ax.hist(lengths, bins=80, color=marker_colors.get(marker, '#333'), edgecolor='white', alpha=0.85)
+            ax.hist(lengths, bins=100, color=marker_colors.get(marker, '#333'),
+                    edgecolor='white', alpha=0.85)
             ax.axvline(np.median(lengths), color='red', ls='--', lw=1.5,
                        label=f'median={np.median(lengths):.0f}bp')
-            ax.set_title(f'{marker} Raw Read Lengths (n={len(lengths):,})', fontweight='bold')
-            ax.set_xlabel('Read Length (bp)')
-            ax.set_ylabel('Count')
+            ax.set_title(f'{marker} \u2014 {len(lengths):,} reads',
+                         fontsize=13, fontweight='bold')
+            ax.set_xlabel('Read length (bp)')
+            ax.set_ylabel('Number of reads')
             ax.legend()
+            print(f'\u2713 {marker}: {len(lengths):,} reads, median={np.median(lengths):.0f}bp, '
+                  f'range={min(lengths)}-{max(lengths)}bp')
         else:
-            ax.set_title(f'{marker}: No data')
+            ax.text(0.5, 0.5, f'{marker}\nNo reads found', ha='center',
+                    va='center', transform=ax.transAxes)
+    plt.suptitle('Raw Read Length Distributions', fontsize=15, fontweight='bold', y=1.02)
     plt.tight_layout()
-    add_conf_note(kind='qc')
     plt.show()
 
 
@@ -306,11 +311,11 @@ def plot_consensus_lengths(base_path, markers, marker_colors=None):
     """Plot consensus OTU sequence length distributions."""
     if marker_colors is None:
         marker_colors = {"18S": "#2196F3", "COI": "#4CAF50", "JEDI": "#FF9800"}
-    
+
     from Bio import SeqIO
     base = Path(base_path)
-    
-    fig, axes = plt.subplots(1, len(markers), figsize=(7*len(markers), 5))
+
+    fig, axes = plt.subplots(1, len(markers), figsize=(14, 5))
     if len(markers) == 1:
         axes = [axes]
     for i, marker in enumerate(markers):
@@ -318,25 +323,32 @@ def plot_consensus_lengths(base_path, markers, marker_colors=None):
         fasta = base / f"temp_clustering/consensus_{marker}_clean.fasta"
         if fasta.exists():
             lengths = [len(rec.seq) for rec in SeqIO.parse(str(fasta), "fasta")]
-            ax.hist(lengths, bins=50, color=marker_colors.get(marker, '#333'), edgecolor='white', alpha=0.85)
+            ax.hist(lengths, bins=50, color=marker_colors.get(marker, '#333'),
+                    edgecolor='white', alpha=0.85)
             ax.axvline(np.median(lengths), color='red', ls='--', lw=1.5,
                        label=f'median={np.median(lengths):.0f}bp')
-            ax.set_title(f'{marker} Consensus OTU Lengths (n={len(lengths)})', fontweight='bold')
-            ax.set_xlabel('Sequence Length (bp)')
-            ax.set_ylabel('Count')
+            ax.set_title(f'{marker} — {len(lengths)} OTUs',
+                         fontsize=13, fontweight='bold')
+            ax.set_xlabel('Sequence length (bp)')
+            ax.set_ylabel('Number of OTUs')
             ax.legend()
+            print(f'✓ {marker}: {len(lengths)} OTUs, median={np.median(lengths):.0f}bp, '
+                  f'range={min(lengths)}-{max(lengths)}bp')
         else:
-            ax.set_title(f'{marker}: No consensus file')
+            ax.text(0.5, 0.5, f'{marker}\nFASTA not found', ha='center',
+                    va='center', transform=ax.transAxes)
+    plt.suptitle('Consensus OTU Sequence Length Distributions',
+                 fontsize=15, fontweight='bold', y=1.02)
     plt.tight_layout()
     add_conf_note(kind='qc')
     plt.show()
 
 
 def plot_reads_per_otu(base_path, markers, marker_colors=None):
-    """Plot reads-per-OTU distribution from consensus FASTA headers."""
+    """Plot reads-per-OTU distribution from consensus FASTA headers (log-scale histogram)."""
     if marker_colors is None:
         marker_colors = {"18S": "#2196F3", "COI": "#4CAF50", "JEDI": "#FF9800"}
-    
+
     base = Path(base_path)
 
     def parse_cluster_sizes(fasta_path):
@@ -352,29 +364,57 @@ def plot_reads_per_otu(base_path, markers, marker_colors=None):
             pass
         return sizes
 
-    fig, axes = plt.subplots(1, len(markers), figsize=(7*len(markers), 5))
+    fig, axes = plt.subplots(1, len(markers), figsize=(14, 5))
     if len(markers) == 1:
         axes = [axes]
-    for i, marker in enumerate(markers):
-        ax = axes[i]
-        fasta = base / f"temp_clustering/consensus_{marker}_clean.fasta"
+    for ax, marker in zip(axes, markers):
+        fasta = base / f"temp_clustering/consensus_{marker}.fasta"
+        sizes = parse_cluster_sizes(str(fasta))
+        if not sizes:
+            ax.text(0.5, 0.5, f'No consensus FASTA found:\n{fasta}',
+                    ha='center', va='center', transform=ax.transAxes, color='red')
+            continue
+
+        vals = sorted(sizes.values())
+        n_total = len(vals)
+        n_spoa = sum(1 for v in vals if v >= 3)
+        n_single = sum(1 for v in vals if v < 3)
+
+        bins = np.logspace(0, np.ceil(np.log10(max(vals))), 30)
+        ax.hist([v for v in vals if v < 3], bins=bins, color='#F44336', alpha=0.85,
+                label=f'Longest read (1–2 reads, n={n_single})')
+        ax.hist([v for v in vals if v >= 3], bins=bins, color='#4CAF50', alpha=0.85,
+                label=f'spoa POA (≥3 reads, n={n_spoa})')
+        ax.axvline(3, ls='--', color='black', lw=1.5, label='spoa threshold (3 reads)')
+        ax.set_xscale('log')
+        ax.set_xlabel('Reads per OTU (log scale)')
+        ax.set_ylabel('Number of OTUs')
+        ax.set_title(f'{marker} — Reads per OTU\n'
+                     f'({n_spoa}/{n_total} OTUs use spoa POA, {100*n_spoa/n_total:.1f}%)')
+        ax.legend(fontsize=9)
+
+        median_spoa = int(np.median([v for v in vals if v >= 3])) if n_spoa else 'N/A'
+        ax.text(0.98, 0.95,
+                f'Median cluster size: {int(np.median(vals))}\nMedian spoa size: {median_spoa}\nMax: {max(vals)}',
+                transform=ax.transAxes, ha='right', va='top',
+                fontsize=9, bbox=dict(boxstyle='round', fc='white', alpha=0.8))
+
+    plt.suptitle('Consensus Quality Assessment — Reads per OTU', fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
+    # Summary table
+    print(f"{'Marker':<8} {'Total OTUs':>12} {'spoa (≥3)':>12} {'Longest rd (<3)':>16} "
+          f"{'% spoa':>8} {'Median reads':>14} {'Max reads':>10}")
+    print("-" * 80)
+    for marker in markers:
+        fasta = base / f"temp_clustering/consensus_{marker}.fasta"
         sizes = parse_cluster_sizes(str(fasta))
         if sizes:
-            vals = sorted(sizes.values(), reverse=True)
-            ax.bar(range(len(vals)), vals, color=marker_colors.get(marker, '#333'), width=1.0)
-            ax.set_xlabel('OTU rank')
-            ax.set_ylabel('Reads per OTU')
-            ax.set_title(f'{marker}: Reads per OTU (n={len(vals)}, total={sum(vals):,})', fontweight='bold')
-            ax.set_yscale('log')
-            # Annotate top 3
-            for j in range(min(3, len(vals))):
-                ax.annotate(f'{vals[j]:,}', (j, vals[j]), textcoords="offset points",
-                            xytext=(5, 5), fontsize=8)
-        else:
-            ax.set_title(f'{marker}: No data')
-    plt.tight_layout()
-    add_conf_note(kind='qc')
-    plt.show()
+            vals = list(sizes.values())
+            n_spoa = sum(1 for v in vals if v >= 3)
+            print(f"{marker:<8} {len(vals):>12} {n_spoa:>12} {len(vals)-n_spoa:>16} "
+                  f"{100*n_spoa/len(vals):>7.1f}% {int(np.median(vals)):>14} {max(vals):>10}")
 
 
 def read_lengths_fastq_gz(path):
@@ -579,7 +619,7 @@ def plot_top_genera_confident(df, prefix, marker_label, sample_cols=None,
 
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.barplot(x=top['Total'], y=top.index, palette='viridis', ax=ax)
-    ax.set_title(f'Top {top_n} Genera - Confident Only (>= {conf_threshold:.2f}) ({marker_label}, {prefix})',
+    ax.set_title(f'Top {top_n} Genera \u2014 Confident Only (\u2265 {conf_threshold:.2f}) ({marker_label}, {prefix})',
                  fontweight='bold')
     ax.set_xlabel('Mean Relative Abundance (% of total reads)')
     ax.set_ylabel('Genus')
