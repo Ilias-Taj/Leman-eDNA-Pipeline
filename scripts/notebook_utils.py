@@ -377,23 +377,25 @@ def plot_reads_per_otu(base_path, markers, marker_colors=None):
     plt.show()
 
 
+def read_lengths_fastq_gz(path):
+    """Read a FASTQ.gz file and return list of sequence lengths."""
+    lengths = []
+    try:
+        with gzip.open(path, "rt") as fh:
+            for i, line in enumerate(fh):
+                if i % 4 == 1:
+                    lengths.append(len(line.strip()))
+    except Exception:
+        pass
+    return lengths
+
+
 def plot_primer_trimming(base_path, markers, marker_colors=None):
     """Plot read length before vs after primer trimming."""
     if marker_colors is None:
         marker_colors = {"18S": "#2196F3", "COI": "#4CAF50", "JEDI": "#FF9800"}
     
     base = Path(base_path)
-
-    def read_lengths_fastq_gz(path):
-        lengths = []
-        try:
-            with gzip.open(path, "rt") as fh:
-                for i, line in enumerate(fh):
-                    if i % 4 == 1:
-                        lengths.append(len(line.strip()))
-        except Exception:
-            pass
-        return lengths
 
     fig, axes = plt.subplots(1, len(markers), figsize=(7*len(markers), 5))
     if len(markers) == 1:
@@ -429,7 +431,7 @@ def plot_primer_trimming(base_path, markers, marker_colors=None):
 
 
 def plot_barcode_reads(base_path, markers, marker_colors=None):
-    """Plot read counts per barcode per marker."""
+    """Plot read counts per barcode per marker (from filtered FASTQ files)."""
     if marker_colors is None:
         marker_colors = {"18S": "#2196F3", "COI": "#4CAF50", "JEDI": "#FF9800"}
     
@@ -440,26 +442,24 @@ def plot_barcode_reads(base_path, markers, marker_colors=None):
     fig, axes = plt.subplots(1, len(markers), figsize=(7*len(markers), 5))
     if len(markers) == 1:
         axes = [axes]
-    for ax_i, marker in enumerate(markers):
-        ax = axes[ax_i]
+    for ax, marker in zip(axes, markers):
+        color = marker_colors.get(marker, '#333')
         counts = []
         for bd in barcode_dirs:
-            fq = bd / f"trimmed_{marker}.fastq.gz"
-            if not fq.exists():
-                fq = bd / f"filtered_reads_{marker}.fastq.gz"
-            n = 0
-            if fq.exists() and fq.stat().st_size > 50:
-                with gzip.open(str(fq), 'rt') as f:
-                    line_count = sum(1 for _ in f)
-                n = line_count // 4
-            counts.append(n)
-        ax.bar(barcode_labels, counts, color=marker_colors.get(marker, '#333'))
-        ax.set_title(f'{marker}: Reads per Barcode', fontweight='bold')
-        ax.set_xlabel('Barcode')
-        ax.set_ylabel('Read Count')
-        ax.tick_params(axis='x', rotation=45)
+            fq = bd / f"filtered_reads_{marker}.fastq.gz"
+            counts.append(len(read_lengths_fastq_gz(str(fq))) if fq.exists() else 0)
+        x = np.arange(len(barcode_labels))
+        ax.bar(x, counts, color=color, alpha=0.8, edgecolor="black", lw=0.4)
+        ax.set_xticks(x)
+        ax.set_xticklabels([lbl.replace("barcode", "bc") for lbl in barcode_labels],
+                           rotation=45, ha="right", fontsize=8)
+        ax.set_xlabel("Barcode")
+        ax.set_ylabel("Number of reads")
+        ax.set_title(f"{marker} — Read Count by Barcode")
+        ax.yaxis.grid(True, linestyle="--", alpha=0.5)
+        ax.set_axisbelow(True)
+    plt.suptitle("Read Count by Barcode", fontweight="bold")
     plt.tight_layout()
-    add_conf_note(kind='qc')
     plt.show()
 
 
