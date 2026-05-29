@@ -162,8 +162,8 @@ log_message "======================================="
 log_message "Threads/jobs per task: $THREADS"
 log_message "Active markers: $MARKERS"
 log_message "Quality threshold (min_mean_q): $MIN_MEAN_Q"
-log_message "Clustering method: VSEARCH (global sequence alignment)"
-log_message "Clustering identity threshold: 0.95"
+log_message "Clustering method: isONclust3 + SPOA consensus"
+log_message "Chimera removal: VSEARCH uchime_denovo"
 log_message ""
 
 # Timing tracking - arrays to collect per-barcode stats
@@ -491,11 +491,15 @@ log_message "[6/7] Generating comprehensive taxonomy summary..."
 update_progress "[SUMMARY] Starting comprehensive summary..."
 summary_start=$(date +%s)
 summary_mem_start=$(get_memory_usage)
+SUMMARY_BLAST_ARG=""
+if [ "${SKIP_BLAST:-false}" = "true" ] && [ -d "$OUTPUT_ROOT/blast_results" ]; then
+  SUMMARY_BLAST_ARG="--blast_dir $OUTPUT_ROOT/blast_results"
+fi
 if ! "$ENV_PREFIX/bin/python3" scripts/7_comprehensive_taxonomy_summary.py \
     --input_dir "$OUTPUT_ROOT" \
     --markers "$MARKERS" \
     $TAXONOMY_DB_ARGS \
-    --skip_blast > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
+    --skip_blast $SUMMARY_BLAST_ARG > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
   echo "Taxonomy summary failed (see $OUTPUT_ROOT/logs/taxonomy_summary.log)" >&2
   log_message "[FAIL] Taxonomy summary FAILED"
   exit 1

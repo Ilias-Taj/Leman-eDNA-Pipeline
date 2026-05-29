@@ -145,6 +145,7 @@ if [[ "$DATASET" == "water" || "$DATASET" == "both" ]] && [ -d "$WATER" ]; then
         --input_dir "$WATER" \
         $WATER_ARGS \
         --skip_blast \
+        --blast_dir "$WATER/blast_results" \
         2>&1 | tee "$WATER/logs/taxonomy_summary.log"
   else
     echo ""
@@ -177,6 +178,7 @@ if [[ "$DATASET" == "soil" || "$DATASET" == "both" ]] && [ -d "$SOIL" ]; then
         --input_dir "$SOIL" \
         $SOIL_ARGS \
         --skip_blast \
+        --blast_dir "$SOIL/blast_results" \
         2>&1 | tee "$SOIL/logs/taxonomy_summary.log"
   else
     echo ""

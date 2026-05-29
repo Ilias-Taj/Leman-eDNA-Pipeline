@@ -50,14 +50,50 @@ _SPOA_MAX_READS = 100  # max reads to use per cluster for POA (speed vs quality)
 # ── Chimera detection (UNCHANGED) ────────────────────────────────────────────
 
 def remove_chimeras(working_dir, marker, vsearch_path):
-    """Detect and remove chimeric OTUs using VSEARCH --uchime_denovo."""
+    """Detect and remove chimeric OTUs using VSEARCH --uchime_denovo.
+
+    uchime_denovo requires sequences sorted by abundance with ;size=N;
+    annotations. Our consensus headers use ;seqs=N so we create a
+    temporary size-annotated FASTA, run uchime, then write the clean
+    output with original headers.
+    """
+    import re
     consensus_in    = working_dir / f"consensus_{marker}.fasta"
     consensus_clean = working_dir / f"consensus_{marker}_clean.fasta"
     chimeras_file   = working_dir / f"chimeras_{marker}.fasta"
+    sized_input     = working_dir / f"consensus_{marker}_sized.fasta"
+
+    # Read consensus and extract size from ;seqs=N
+    records = []  # list of (header, seq, size)
+    with open(consensus_in) as f:
+        header, seq_lines = None, []
+        for line in f:
+            if line.startswith(">"):
+                if header is not None:
+                    records.append((header, "".join(seq_lines)))
+                header = line[1:].strip()
+                seq_lines = []
+            else:
+                seq_lines.append(line.strip())
+        if header is not None:
+            records.append((header, "".join(seq_lines)))
+
+    # Parse size from seqs= field and sort by descending abundance
+    def get_size(hdr):
+        m = re.search(r"seqs=(\d+)", hdr)
+        return int(m.group(1)) if m else 1
+
+    records.sort(key=lambda r: get_size(r[0]), reverse=True)
+
+    # Write size-annotated FASTA (;size=N appended)
+    with open(sized_input, "w") as f:
+        for hdr, seq in records:
+            size = get_size(hdr)
+            f.write(f">{hdr};size={size}\n{seq}\n")
 
     cmd = [
         vsearch_path,
-        "--uchime_denovo", str(consensus_in),
+        "--uchime_denovo", str(sized_input),
         "--nonchimeras",   str(consensus_clean),
         "--chimeras",      str(chimeras_file),
         "--xsize",
@@ -65,6 +101,10 @@ def remove_chimeras(working_dir, marker, vsearch_path):
 
     print(f"Running Chimera Detection for {marker}...")
     subprocess.run(cmd, check=True)
+
+    # Clean up temp file
+    sized_input.unlink(missing_ok=True)
+
     return consensus_clean, chimeras_file
 
 

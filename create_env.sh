@@ -28,5 +28,9 @@ fi
 
 echo ""
 echo "Environment successfully created at: $ENV_PREFIX"
-echo "Tools installed: filtlong, vsearch, samtools, biopython, pandas, matplotlib, seaborn, ipykernel"
+echo "Tools installed: filtlong, vsearch, samtools, cutadapt, biopython, pandas, matplotlib, seaborn, numpy, ipykernel"
 echo "Activate it with: conda activate $ENV_PREFIX"
+echo ""
+echo "External tools (not in conda, install separately in tools/):"
+echo "  - minimap2: download from https://github.com/lh3/minimap2/releases"
+echo "  - isONclust3: cargo install isONclust3 (requires Rust)"

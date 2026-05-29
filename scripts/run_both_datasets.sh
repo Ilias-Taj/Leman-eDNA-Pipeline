@@ -18,7 +18,7 @@ set -eo pipefail
 #               Add usage() help function.
 # ── Defaults ──────────────────────────────────────────────────
 DB_18S="pr2"
-DB_COI="porter"
+DB_COI="midori2"
 DB_JEDI="pr2"
 THREADS=14
 SKIP_BLAST=false

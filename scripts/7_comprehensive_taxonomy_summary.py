@@ -183,6 +183,55 @@ def run_blast_batch(sequences, otu_ids):
     
     return blast_results
 
+def parse_blast_results_dir(blast_dir, marker):
+    """Parse existing BLAST result .txt files from blast_dir for a given marker.
+
+    Reads blast_top*_{abundance,confidence}_{marker}.txt files and returns
+    a dict: OTU_ID -> {species, identity, evalue}.
+    """
+    blast_dir = Path(blast_dir)
+    if not blast_dir.is_dir():
+        return {}
+
+    results = {}
+    # Match files like blast_top10_abundance_COI.txt, blast_top10_confidence_18S.txt
+    patterns = [
+        f"blast_top*_abundance_{marker}.txt",
+        f"blast_top*_confidence_{marker}.txt",
+        f"blast_top*_{marker}.txt",  # legacy format without criterion
+    ]
+    files_found = []
+    for pat in patterns:
+        files_found.extend(blast_dir.glob(pat))
+
+    for fpath in sorted(set(files_found)):
+        with open(fpath, 'r') as f:
+            lines = f.readlines()
+        reading = False
+        for line in lines:
+            if line.startswith('---'):
+                reading = True
+                continue
+            if not reading or not line.strip():
+                continue
+            parts = line.split('|')
+            if len(parts) >= 4:
+                otu_id = parts[0].strip()
+                species = parts[2].strip()
+                identity_str = parts[3].strip().replace('%', '')
+                evalue_str = parts[4].strip() if len(parts) >= 5 else 'N/A'
+                try:
+                    identity = float(identity_str) if identity_str and identity_str != '-' else 0
+                    results[otu_id] = {
+                        'species': species,
+                        'identity': round(identity, 1),
+                        'evalue': evalue_str if evalue_str else 'N/A',
+                    }
+                except (ValueError, TypeError):
+                    continue
+    return results
+
+
 def detect_db_prefix(db_path, marker):
     """Detect taxonomy column prefix from database filename.
 
@@ -214,6 +263,9 @@ def main():
     parser.add_argument("--input_dir", required=True, help="Input directory")
     parser.add_argument("--blast_n", type=int, default=0, help="Number of top OTUs to BLAST per marker (0=skip)")
     parser.add_argument("--skip_blast", action='store_true', help="Skip BLAST, use only local taxonomy")
+    parser.add_argument("--blast_dir", default=None,
+                        help="Path to existing BLAST results directory. When --skip_blast is set, "
+                             "existing results from this directory are incorporated into the summary.")
     parser.add_argument("--markers", default=None,
                         help="Comma-separated list of markers (default: auto-detect from merged/ files)")
     # Note: confidence filtering is now done in analysis notebooks, not here
@@ -300,7 +352,7 @@ def main():
             print(f"  [WARN] Taxonomy file not found")
 
         
-        # 4. Run BLAST if requested
+        # 4. Run BLAST if requested, or load existing results from blast_dir
         blast_results = {}
         if not args.skip_blast and args.blast_n > 0:
             print(f"[4/5] Running BLAST on top {args.blast_n} OTUs...")
@@ -323,8 +375,16 @@ def main():
             
             print(f"  Loaded {len(sequences)} sequences")
             blast_results = run_blast_batch(sequences, top_otus)
+        elif args.blast_dir:
+            blast_dir = Path(args.blast_dir)
+            print(f"[4/5] Loading existing BLAST results from {blast_dir}")
+            blast_results = parse_blast_results_dir(blast_dir, marker)
+            if blast_results:
+                print(f"  Loaded {len(blast_results)} BLAST results for {marker}")
+            else:
+                print(f"  No existing BLAST results found for {marker} in {blast_dir}")
         else:
-            print("[4/5] Skipping BLAST")
+            print("[4/5] Skipping BLAST (no --blast_dir provided)")
         
         # 5. Create comprehensive summary
         print("[5/5] Creating summary CSV...")
