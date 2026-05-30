@@ -32,7 +32,7 @@ Usage:
         --input_dir out/Soil_eDNA_JEDI_COI_14_01_26 --markers JEDI,COI
 
 Changelog:
-    2026-05-12  Increase default threads from 4 to 8 for classify_reads_minimap2().
+    2026-05-12  Hardcode minimap2 threads to 4 (sufficient for length-based marker classification).
 """
 
 import argparse
@@ -241,7 +241,7 @@ def extract_marker_references(refs_dir, marker, db_path_or_name, vsearch_path,
 # ── minimap2 classification ───────────────────────────────────────────────────
 
 def classify_reads_minimap2(fastq_gz, refs_per_marker, minimap2_path,
-                             temp_dir, active_markers, threads=8):
+                             temp_dir, active_markers, threads=4):
     """Classify reads via minimap2 against combined marker reference sequences.
 
     Reference headers must start with '{marker}_' (written by
