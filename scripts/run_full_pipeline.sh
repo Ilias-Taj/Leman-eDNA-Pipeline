@@ -159,6 +159,14 @@ log_message "Quality threshold (min_mean_q): $MIN_MEAN_Q"
 log_message "Clustering method: isONclust3 + SPOA consensus"
 log_message "Chimera removal: VSEARCH uchime_denovo"
 log_message ""
+log_message "TOOL VERSIONS"
+log_message "======================================="
+log_message "minimap2: $(./tools/minimap2-2.30_x64-linux/minimap2 --version 2>/dev/null || echo 'not found')"
+log_message "isONclust3: $($ISONCLUST3_PATH --version 2>/dev/null || echo 'not found')"
+log_message "vsearch: $(vsearch --version 2>&1 | head -1 || echo 'not found')"
+log_message "cutadapt: $(cutadapt --version 2>/dev/null || echo 'not found')"
+log_message "samtools: $(samtools --version 2>/dev/null | head -1 || echo 'not found')"
+log_message ""
 
 # Timing tracking - arrays to collect per-barcode stats
 declare -a barcode_names

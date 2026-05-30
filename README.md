@@ -64,8 +64,11 @@ conda env create -f environment.yml -p ./env
 Tools installed via conda: filtlong, vsearch (v2.30+), python 3.10, samtools, cutadapt, biopython, pandas, matplotlib, seaborn.
 
 **External tools (pre-compiled/built, placed in `tools/`):**
-- [minimap2 v2.30](https://github.com/lh3/minimap2) — Pre-compiled x64 binary for read-to-reference alignment
-- [isONclust3](https://github.com/aljpetri/isONclust3) — Rust-based ONT read clustering (compiled from source with `cargo build --release`)
+
+> **Upgrading:** Newer versions of these tools are generally backward-compatible. To upgrade, simply replace the binary/folder in `tools/` and re-run the pipeline. The pipeline logs tool versions at startup for reproducibility.
+
+- [minimap2 v2.30+](https://github.com/lh3/minimap2/releases) — Pre-compiled x64 binary for read-to-reference alignment (tested with v2.30; newer versions should work)
+- [isONclust3](https://github.com/aljpetri/isONclust3) — Rust-based ONT read clustering (`cargo build --release` or download a release binary if available)
 
 ## Database Setup
 
