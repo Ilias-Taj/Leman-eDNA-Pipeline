@@ -1031,9 +1031,9 @@ def compare_db_phylum_composition(db_datasets, marker_label, sample_cols=None,
         wedges, texts, autotexts = ax.pie(
             plot_data.values, labels=None, autopct='%1.1f%%',
             colors=colors, startangle=90, pctdistance=0.85)
-        ax.set_title(f'{db_label}', fontweight='bold', fontsize=12)
+        ax.set_title(f'{db_label}\n(% of total reads)', fontweight='bold', fontsize=12)
         ax.legend(plot_data.index, loc='center left', bbox_to_anchor=(-0.3, 0.5), fontsize=8)
     
-    fig.suptitle(f'{marker_label}: Phylum Composition by Database', fontsize=14, fontweight='bold')
+    fig.suptitle(f'{marker_label}: Phylum Composition by Database (read abundance)', fontsize=14, fontweight='bold')
     plt.tight_layout()
     plt.show()
