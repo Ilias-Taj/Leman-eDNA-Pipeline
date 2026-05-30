@@ -254,7 +254,7 @@ def generate_consensus_from_clusters(isonclust_out_dir, working_dir, marker,
                 for line in fq_in:
                     buf.append(line.rstrip("\n"))
                     if len(buf) == 4:
-                        reads.append((buf[0][1:], buf[1]))  # strip '@'
+                        reads.append((buf[0][1:].split()[0], buf[1]))  # strip '@', truncate at whitespace
                         buf = []
 
             n_reads = len(reads)
