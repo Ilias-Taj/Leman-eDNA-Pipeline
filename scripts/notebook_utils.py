@@ -445,12 +445,12 @@ def plot_primer_trimming(base_path, markers, marker_colors=None):
         ax = axes[i]
         before, after = [], []
         for bd in sorted(base.glob("barcode*")):
-            raw = bd / f"filtered_reads_{marker}.fastq.gz"
-            trimmed = bd / f"trimmed_{marker}.fastq.gz"
-            if raw.exists():
-                before.extend(read_lengths_fastq_gz(str(raw)))
-            if trimmed.exists():
-                after.extend(read_lengths_fastq_gz(str(trimmed)))
+            pretrim = bd / f"filtered_reads_{marker}.pretrim.fastq.gz"
+            posttrim = bd / f"filtered_reads_{marker}.fastq.gz"
+            if pretrim.exists():
+                before.extend(read_lengths_fastq_gz(str(pretrim)))
+            if posttrim.exists():
+                after.extend(read_lengths_fastq_gz(str(posttrim)))
         
         if before or after:
             if before:
