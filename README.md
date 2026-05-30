@@ -240,7 +240,7 @@ Each notebook includes: confidence dashboards, DB performance comparison, taxono
 
 - **Nanopore-specific:** No PCR duplicate removal (dereplication) before clustering — Nanopore reads each originate from a unique molecule, so pre-clustering dereplication has no effect. Post-clustering dereplication of consensus sequences is a potential improvement when merging multiple runs.
 - **Classification:** Reads are separated by amplicon length. JEDI (250–500 bp) targets the same rRNA gene family as 18S but with different primers (515F-Y/926R), so it uses an 18S/SSU database (PR2 or SILVA), not a COI database.
-- **Clustering:** VSEARCH at 95% identity with consensus generation to correct Nanopore errors. Chimeras removed with `uchime_denovo`.
+- **Clustering:** isONclust3 (quality-aware ONT clustering) with SPOA consensus polishing. Chimeras removed with VSEARCH `uchime_denovo`.
 - **Confidence filtering:** Taxonomy assignments include per-rank confidence scores (0–1). Analysis notebooks filter at confidence ≥ 0.8 by default.
 
 ## Next Steps
@@ -298,11 +298,17 @@ Developed for the [Genorobotics](https://make.epfl.ch/projects/14/make-genorobot
 
 - **minimap2:** Li, H. (2018). Minimap2: pairwise alignment for nucleotide sequences. *Bioinformatics*, 34(18):3094–3100. doi:[10.1093/bioinformatics/bty191](https://doi.org/10.1093/bioinformatics/bty191). GitHub: [lh3/minimap2](https://github.com/lh3/minimap2)
 - **isONclust3:** Petri, A.J., Sahlin, K. (2025). De novo clustering of large long-read transcriptome datasets with isONclust3. *Bioinformatics*, btaf207. doi:[10.1093/bioinformatics/btaf207](https://doi.org/10.1093/bioinformatics/btaf207). GitHub: [aljpetri/isONclust3](https://github.com/aljpetri/isONclust3)
+- **SPOA:** Vaser, R., Sović, I., Nagarajan, N., Šikić, M. (2017). Fast and accurate de novo genome assembly from long uncorrected reads. *Genome Research*, 27(5):737–746. doi:[10.1101/gr.214270.116](https://doi.org/10.1101/gr.214270.116). GitHub: [rvaser/spoa](https://github.com/rvaser/spoa)
+- **VSEARCH:** Rognes, T., Flouri, T., Nichols, B., Quince, C., Mahé, F. (2016). VSEARCH: a versatile open source tool for metagenomics. *PeerJ*, 4:e2584. doi:[10.7717/peerj.2584](https://doi.org/10.7717/peerj.2584). GitHub: [torognes/vsearch](https://github.com/torognes/vsearch)
+- **cutadapt:** Martin, M. (2011). Cutadapt removes adapter sequences from high-throughput sequencing reads. *EMBnet.journal*, 17(1):10–12. doi:[10.14806/ej.17.1.200](https://doi.org/10.14806/ej.17.1.200)
+- **filtlong:** Wick, R. (2021). Filtlong: quality filtering tool for long reads. GitHub: [rrwick/Filtlong](https://github.com/rrwick/Filtlong)
 - **ONT-AmpSeq:** The clustering and consensus generation strategy is inspired by the [ONT-AmpSeq pipeline](https://github.com/michoug/ONT-AmpSeq).
+- **SINTAX:** Edgar, R.C. (2016). SINTAX: a simple non-Bayesian taxonomy classifier for 16S and ITS sequences. *bioRxiv*, 074161. doi:[10.1101/074161](https://doi.org/10.1101/074161)
 
 #### Databases
 
 - **SILVA Database:** 18S rRNA reference database from [SILVA v123](https://www.arb-silva.de/), pre-formatted for SINTAX available at [USEARCH SINTAX Downloads](https://www.drive5.com/usearch/manual/sintax_downloads.html)
 - **eKOI Database:** Gonzalez-Miguens, R., Galvez-Morante, A., Skamnelou, M., Anto, M., Casacuberta, E., Richter, D.J., Vaulot, D., del Campo, J., Ruiz-Trillo, I. (2024). bioRxiv 2024.12.05.626972. doi:[10.1101/2024.12.05.626972](https://doi.org/10.1101/2024.12.05.626972)
 - **PR2 Database:** Guillou, L., Bachar, D., Audic, S., Bass, D., Berney, C., Bittner, L., Boutte, C. et al. (2013). [The Protist Ribosomal Reference database (PR<sup>2</sup>): a catalog of unicellular eukaryote Small Sub-Unit rRNA sequences with curated taxonomy](http://nar.oxfordjournals.org/lookup/doi/10.1093/nar/gks1160). *Nucleic Acids Res.* 41:D597–604.
+- **MIDORI2 Database:** Machida, R.J., Leray, M., Ho, S.-L., Knowlton, N. (2017). Metazoan mitochondrial gene sequence reference datasets for taxonomic assignment of environmental samples. *Scientific Data*, 4:170027. doi:[10.1038/sdata.2017.27](https://doi.org/10.1038/sdata.2017.27). Website: [reference-midori.info](http://www.reference-midori.info/)
 - **Porter CO1 Database:** Porter, T.M. (2017). Eukaryote CO1 Reference Set For The RDP Classifier (v4.0.1). Zenodo. doi:[10.5281/zenodo.4741447](http://doi.org/10.5281/zenodo.4741447)
