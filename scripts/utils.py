@@ -76,11 +76,22 @@ def find_isonclust3() -> str:
 
 
 def find_minimap2() -> str:
-    """Locate minimap2 binary, checking the bundled tools/ path first."""
-    return find_tool(
-        "minimap2",
-        extra_candidates=["./tools/minimap2-2.30_x64-linux/minimap2"],
-    )
+    """Locate minimap2 binary, checking the bundled tools/ path first.
+
+    Supports any version: searches tools/minimap2*/minimap2 and tools/minimap2-*/minimap2
+    so upgrading only requires replacing the folder in tools/.
+    """
+    import glob
+    # Auto-discover any minimap2 version in tools/
+    candidates = sorted(glob.glob("./tools/minimap2*/minimap2")) +                  sorted(glob.glob("./tools/minimap2-*/minimap2"))
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+    return find_tool("minimap2", extra_candidates=unique)
 
 
 # ── FASTQ helpers ────────────────────────────────────────────────────────────

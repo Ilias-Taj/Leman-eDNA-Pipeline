@@ -43,7 +43,7 @@ from pathlib import Path
 
 # Ensure scripts/ is on the import path so utils.py can be found from any cwd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import SKIP_DIRS, find_tool
+from utils import SKIP_DIRS, find_tool, find_minimap2
 
 # Sequence length thresholds (bp) for each marker
 MARKER_RANGES = {
@@ -484,10 +484,7 @@ def main():
     refs_per_marker = {}
     minimap2_path = None
     if args.use_minimap2:
-        minimap2_path = find_tool(
-            "minimap2",
-            extra_candidates=["./tools/minimap2-2.30_x64-linux/minimap2"],
-        )
+        minimap2_path = find_minimap2()
         vsearch_path = find_tool("vsearch")
         db_args = {"18S": args.db_18S, "COI": args.db_COI, "JEDI": args.db_JEDI}
         print("Extracting minimap2 reference sequences...")
