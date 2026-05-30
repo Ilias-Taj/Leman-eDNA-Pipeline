@@ -91,7 +91,7 @@ cd ..
 ### COI Databases
 
 **MIDORI2** (recommended — largest COI database, best at species rank):
-1. Download the SINTAX-formatted FASTA from [MIDORI2](http://www.reference-midori.info/download.php) (GB269, CO1, SINTAX format)
+1. Download the SINTAX-formatted FASTA from [MIDORI2](https://www.reference-midori.info/download.php) (GB269, CO1, SINTAX format)
 2. Place it in `refs/` as `MIDORI2_UNIQ_NUC_SP_GB269_CO1_SINTAX.fasta`
 3. Build the UDB:
 ```bash
