@@ -9,7 +9,7 @@ Prerequisites:
     1. Run 3_run_clustering_by_marker.py first
     2. Download and prepare reference databases:
        - 18S: SILVA database (https://www.drive5.com/usearch/manual/sintax_downloads.html)
-       - COI: Database to be determined 
+       - COI: MIDORI2 (https://reference-midori.info/) or Porter (https://portal.unite.ut.ee/) 
     3. Convert to .udb format:
        wget https://www.drive5.com/sintax/silva_18s_v123.fa.gz
        gunzip silva_18s_v123.fa.gz

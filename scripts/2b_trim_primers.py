@@ -36,10 +36,10 @@ Usage:
     python scripts/2b_trim_primers.py --input_dir ... --skip
 
 Changelog:
-    2026-05-12  Fix IUPAC complement table: M↔K mapping was broken
+    2025-05-12  Fix IUPAC complement table: M↔K mapping was broken
                 (Mk instead of mk in lowercase section of str.maketrans).
                 Removed dead functions: iupac_to_regex(), primer_in_region().
-    2026-05-11  Initial implementation: replaced Porechop ABI with
+    2025-05-11  Initial implementation: replaced Porechop ABI with
                 primer-based reclassification (Phase 1) + cutadapt (Phase 2).
                 External primer config via primers.tsv.
 """

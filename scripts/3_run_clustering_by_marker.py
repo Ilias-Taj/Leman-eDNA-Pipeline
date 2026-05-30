@@ -3,7 +3,7 @@
 3_run_clustering_by_marker.py - CLUSTERING + CHIMERA DETECTION
 
 Clusters reads per marker using isONclust3, generates per-cluster consensus
-sequences with VSEARCH, then removes chimeric OTUs.
+sequences with SPOA POA (or longest-read fallback), then removes chimeric OTUs with VSEARCH.
 
 Prerequisite: Run 2_classify_markers.py first
 
@@ -21,7 +21,7 @@ Output:
     - global_otu_assignment_{marker}.txt  (per-marker assignment files)
 
 Changelog:
-    2026-05-12  Add optional spoa POA consensus for OTU representative sequences.
+    2025-05-12  Add optional spoa POA consensus for OTU representative sequences.
                 Falls back to longest-read method when spoa unavailable or
                 cluster has < 3 reads. Cap at 100 reads per consensus (_SPOA_MAX_READS).
 """
@@ -111,7 +111,7 @@ def remove_chimeras(working_dir, marker, vsearch_path):
 def load_chimera_ids(chimeras_fasta):
     """Load chimera centroid IDs from a FASTA file.
 
-    VSEARCH consensus headers look like:
+    Consensus FASTA headers (from isONclust3/SPOA) look like:
         >centroid=OTU_18S_000001;seqs=N
     We strip 'centroid=' so the IDs match OTU ID format used in assignments.
     """

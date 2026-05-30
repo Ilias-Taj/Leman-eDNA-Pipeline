@@ -41,14 +41,14 @@ Note:
     with NCBI usage policies. Expect ~1-2 minutes per sequence.
 
 Changelog:
-    2026-05-13  Split BLAST into two runs: top 10 by abundance + top 10 by confidence.
+    2025-05-13  Split BLAST into two runs: top 10 by abundance + top 10 by confidence.
                 Output filename now includes selection criterion (abundance/confidence).
-    2026-05-12  Reorder: runs as step 7 (after summary). Adds --update_summary
+    2025-05-12  Reorder: runs as step 7 (after summary). Adds --update_summary
                 to write BLAST results back into the comprehensive taxonomy CSV.
                 Add 5-min timeout per NCBI query (signal.alarm) to prevent hangs.
                 Change --select_by confidence to pick highest confidence OTUs
                 (validates best SINTAX calls against NCBI).
-    2026-05-11  Fix isONclust3 FASTA header support in get_sequence_for_otu().
+    2025-05-11  Fix isONclust3 FASTA header support in get_sequence_for_otu().
                 Add --select_by confidence mode (reads taxonomy summary CSV).
 """
 
@@ -119,7 +119,7 @@ def get_sequence_for_otu(fasta_path, otu_id, otu_to_reads_map):
 
     Supports two FASTA header formats:
       - isONclust3: >centroid=OTU_18S_000001;seqs=123  (OTU ID in header directly)
-      - VSEARCH:    >centroid=uuid|barcode|marker;size=100  (read UUID in header)
+      - Fallback:    >centroid=uuid|barcode|marker;seqs=100  (read UUID in header)
     Returns (sequence, found_id) or (None, None) if not found.
     """
     candidates = otu_to_reads_map.get(otu_id, set())
@@ -132,7 +132,7 @@ def get_sequence_for_otu(fasta_path, otu_id, otu_to_reads_map):
             if header_clean == otu_id:
                 return str(record.seq), header_clean
 
-            # VSEARCH fallback: header is a read UUID, match via otu_to_reads mapping
+            # Fallback: header is a read UUID, match via otu_to_reads mapping
             if header_clean in candidates:
                 return str(record.seq), header_clean
 

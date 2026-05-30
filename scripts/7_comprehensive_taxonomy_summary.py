@@ -24,7 +24,7 @@ Output:
     - {input_dir}/comprehensive_taxonomy_COI.csv
 
 Changelog:
-    2026-05-12  Reorder: now runs as step 6 (before BLAST).
+    2025-05-12  Reorder: now runs as step 6 (before BLAST).
                 Creates CSV with blank NCBI_TopHit/Identity/Evalue columns.
                 BLAST (step 7) fills them in via --update_summary.
                 Cosmetic whitespace cleanup only in code.

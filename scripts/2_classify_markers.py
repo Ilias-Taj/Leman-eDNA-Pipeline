@@ -32,7 +32,7 @@ Usage:
         --input_dir out/Soil_eDNA_JEDI_COI_14_01_26 --markers JEDI,COI
 
 Changelog:
-    2026-05-12  Hardcode minimap2 threads to 4 (sufficient for length-based marker classification).
+    2025-05-12  Hardcode minimap2 threads to 4 (sufficient for length-based marker classification).
 """
 
 import argparse

@@ -22,7 +22,7 @@ cd "$SCRIPT_DIR/.."
 #   --db_JEDI: silva | pr2  (JEDI targets rRNA V4-V5, same as 18S)
 #   --db:      shorthand for --db_COI
 # Changelog:
-#   2026-05-12  No code changes. File mode fix (chmod +x).
+#   2025-05-12  No code changes. File mode fix (chmod +x).
 #               Step numbers unchanged: runs steps 5 + 7 (summary, no BLAST).
 
 ENV_PREFIX="./env"
