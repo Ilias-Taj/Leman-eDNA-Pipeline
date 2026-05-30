@@ -13,20 +13,20 @@ Prerequisites:
     3. Convert to .udb format:
        wget https://www.drive5.com/sintax/silva_18s_v123.fa.gz
        gunzip silva_18s_v123.fa.gz
-       vsearch --makeudb_usearch silva_18s_v123.fa --output silva_18s.udb
+       vsearch --makeudb_usearch silva_18s_v123.fa --output silva_18S.udb
 
 Usage Examples:
     # With both databases
     python scripts/5_assign_taxonomy.py \
         --input_dir out/Water_eDNA_18S_COI_14_01_26 \
-        --db_18S refs/silva_18s_v123.udb \
+        --db_18S refs/silva_18S.udb \
         --db_COI refs/midori2_COI.udb \
         --threads 12
     
     # 18S only
     python scripts/5_assign_taxonomy.py \
         --input_dir out/Water_eDNA_18S_COI_14_01_26 \
-        --db_18S refs/silva_18s_v123.udb \
+        --db_18S refs/silva_18S.udb \
         --threads 12
     
     # COI only
@@ -212,14 +212,14 @@ Examples:
   # Process both 18S and COI
   python scripts/5_assign_taxonomy.py \\
       --input_dir out/Water_eDNA_18S_COI_14_01_26 \\
-      --db_18S refs/silva_18s_v123.udb \\
+      --db_18S refs/silva_18S.udb \\
       --db_COI refs/midori2_COI.udb \\
       --threads 12
   
   # Process 18S only with SILVA database
   python scripts/5_assign_taxonomy.py \\
       --input_dir out/Water_eDNA_18S_COI_14_01_26 \\
-      --db_18S refs/silva_18s_v123.udb \\
+      --db_18S refs/silva_18S.udb \\
       --threads 12
 
 Database Preparation:
@@ -228,7 +228,7 @@ Database Preparation:
      gunzip SILVA_123_SSURef_tax_silva.fasta.gz
   
   2. Convert to VSEARCH UDB format:
-     vsearch --makeudb_usearch SILVA_123_SSURef_tax_silva.fasta --output silva_18s_v123.udb
+     vsearch --makeudb_usearch SILVA_123_SSURef_tax_silva.fasta --output silva_18S.udb
   
   3. For COI, download MIDORI2 and convert similarly
         """)

@@ -82,12 +82,13 @@ bash refs/setup_pr2_18s.sh
 ```
 This downloads PR2 v5.1.1, converts it to SINTAX format using `refs/convert_pr2_to_sintax.py`, and builds the UDB.
 
-**SILVA v123** (broader coverage, lower resolution):
+**SILVA** (broader coverage, lower resolution):
 ```bash
 cd refs/
+# Download from https://www.drive5.com/sintax/ (e.g. v123)
 wget https://www.drive5.com/sintax/silva_18s_v123.fa.gz
 gunzip silva_18s_v123.fa.gz
-../env/bin/vsearch --makeudb_usearch silva_18s_v123.fa --output silva_18s_v123.udb
+../env/bin/vsearch --makeudb_usearch silva_18s_v123.fa --output silva_18S.udb
 cd ..
 ```
 

@@ -236,7 +236,7 @@ def detect_db_prefix(db_path, marker):
     """Detect taxonomy column prefix from database filename.
 
     Inspects the database filename to determine the CSV column prefix:
-      silva_18s_v123.udb -> 'SILVA'
+      silva_18S.udb -> 'SILVA'
       eKOI_COI.udb       -> 'eKOI'
       midori2_COI.udb    -> 'MIDORI2'
     Falls back to 'SILVA' for 18S/JEDI (rRNA), 'eKOI' for COI if no path provided.

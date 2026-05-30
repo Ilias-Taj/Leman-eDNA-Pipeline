@@ -67,7 +67,7 @@ resolve_db() {
   [ -z "$choice" ] && return 0
 
   case "$choice" in
-    silva|SILVA)                      echo "refs/silva_18s_v123.udb" ;;
+    silva|SILVA)                      echo "refs/silva_18S.udb" ;;
     pr2|PR2)                          echo "refs/pr2_18S.udb" ;;
     midori2|MIDORI2|midori|MIDORI)    echo "refs/midori2_COI.udb" ;;
     eKOI|ekoi)                        echo "refs/eKOI_COI.udb" ;;

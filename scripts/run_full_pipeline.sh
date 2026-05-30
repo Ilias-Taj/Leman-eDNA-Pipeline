@@ -413,13 +413,13 @@ resolve_18s_db() {
   if [ -n "$choice" ]; then
     case "$choice" in
       pr2|PR2)     echo "refs/pr2_18S.udb" ;;
-      silva|SILVA) echo "refs/silva_18s_v123.udb" ;;
+      silva|SILVA) echo "refs/silva_18S.udb" ;;
       *) [ -f "$choice" ] && echo "$choice" || { echo "ERROR: Unknown 18S DB '$choice'" >&2; exit 1; } ;;
     esac
   else
     # Default: prefer PR2, fall back to SILVA
     if [ -f refs/pr2_18S.udb ]; then echo "refs/pr2_18S.udb"
-    elif [ -f refs/silva_18s_v123.udb ]; then echo "refs/silva_18s_v123.udb"
+    elif [ -f refs/silva_18S.udb ]; then echo "refs/silva_18S.udb"
     else echo ""; fi
   fi
 }

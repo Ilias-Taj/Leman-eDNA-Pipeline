@@ -5,7 +5,7 @@ Each marker's taxonomy is stored independently per DB, so running with
 different DB combinations doesn't duplicate files.
 
 Examples:
-    marker_db_label("refs/pr2_18s_v511.udb")  -> "pr2"
+    marker_db_label("refs/pr2_18s.udb")  -> "pr2"
     marker_db_label("refs/midori2_COI.udb")    -> "midori2"
 """
 from __future__ import annotations
@@ -15,11 +15,11 @@ from typing import Optional
 
 # Hardcoded mapping from known .udb filenames to short labels
 _DB_LABELS = {
-    "silva_18s_v123":  "silva",
-    "pr2_18s_v511":    "pr2",
+    "silva_18s":  "silva",
+    "pr2_18s":    "pr2",
     "midori2_coi":     "midori2",
     "ekoi_coi":        "ekoi",
-    "porter_coi_v51":  "porter",
+    "porter_coi":  "porter",
 }
 
 
