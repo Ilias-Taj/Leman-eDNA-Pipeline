@@ -24,11 +24,9 @@ KEEP_PERCENT=100
 MIN_LENGTH=0
 MIN_MEAN_Q=15
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
-USE_MINIMAP2=true
 SKIP_TRIMMING=false
 SKIP_BLAST=false
 ISONCLUST3_PATH="./tools/isONclust3/target/release/isONclust3"
-MINIMAP2_PATH="./tools/minimap2-2.30_x64-linux/minimap2"
 
 # Database overrides (empty = auto-detect from refs/)
 DB_18S=""   # e.g. silva, pr2, or path to .udb
@@ -64,8 +62,6 @@ Options:
   --db_COI DB        COI database: midori2 (default), ekoi, porter, or path to .udb
   --db_JEDI DB       JEDI database: pr2 (default), silva, or path to .udb
   --isonclust3 PATH  Path to isONclust3 binary (default: tools/isONclust3/...)
-  --minimap2 PATH    Path to minimap2 binary (default: tools/minimap2-...)
-  --use_minimap2     Enable minimap2-based marker classification (default: true)
   --skip_trimming    Skip primer trimming step 2b (default: false)
   --skip_blast       Skip BLAST validation step 7 (default: false)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
@@ -110,8 +106,6 @@ while [[ $# -gt 0 ]]; do
     --db_COI) DB_COI="$2"; shift 2;;
     --db_JEDI) DB_JEDI="$2"; shift 2;;
     --isonclust3) ISONCLUST3_PATH="$2"; shift 2;;
-    --minimap2) MINIMAP2_PATH="$2"; shift 2;;
-    --use_minimap2) USE_MINIMAP2=true; shift;;
     --skip_trimming) SKIP_TRIMMING=true; shift;;
     --skip_blast) SKIP_BLAST=true; shift;;
     -h|--help) usage; exit 0;;
@@ -303,13 +297,10 @@ log_message "[2/7] Classifying reads by marker..."
 update_progress "[MARKER] Starting marker classification..."
 marker_start=$(date +%s)
 marker_mem_start=$(get_memory_usage)
-_MM2_ARGS=""
-if [ "${USE_MINIMAP2:-false}" = "true" ]; then
-  _MM2_ARGS="--use_minimap2 --refs_dir refs/"
-  [ -n "$DB_18S" ]  && _MM2_ARGS="$_MM2_ARGS --db_18S $DB_18S"
-  [ -n "$DB_COI" ]  && _MM2_ARGS="$_MM2_ARGS --db_COI $DB_COI"
-  [ -n "$DB_JEDI" ] && _MM2_ARGS="$_MM2_ARGS --db_JEDI $DB_JEDI"
-fi
+_MM2_ARGS="--use_minimap2 --refs_dir refs/"
+[ -n "$DB_18S" ]  && _MM2_ARGS="$_MM2_ARGS --db_18S $DB_18S"
+[ -n "$DB_COI" ]  && _MM2_ARGS="$_MM2_ARGS --db_COI $DB_COI"
+[ -n "$DB_JEDI" ] && _MM2_ARGS="$_MM2_ARGS --db_JEDI $DB_JEDI"
 # shellcheck disable=SC2086
 if ! "$ENV_PREFIX/bin/python3" scripts/2_classify_markers.py \
     --input_dir "$OUTPUT_ROOT" \
