@@ -68,6 +68,14 @@ def rc(seq: str) -> str:
 
 
 
+_IUPAC_SETS = {
+    "A": {"A"}, "C": {"C"}, "G": {"G"}, "T": {"T"},
+    "R": {"A","G"}, "Y": {"C","T"}, "M": {"A","C"}, "K": {"G","T"},
+    "S": {"C","G"}, "W": {"A","T"}, "B": {"C","G","T"}, "V": {"A","C","G"},
+    "D": {"A","G","T"}, "H": {"A","C","T"}, "N": {"A","C","G","T"},
+}
+
+
 def hamming_match(region: str, primer: str, max_err_rate: float = 0.20) -> bool:
     """
     Sliding-window Hamming distance match (IUPAC-aware on primer side).
@@ -78,19 +86,12 @@ def hamming_match(region: str, primer: str, max_err_rate: float = 0.20) -> bool:
     max_err = int(plen * max_err_rate)
     primer_up = primer.upper()
 
-    _iupac_sets = {
-        "A": {"A"}, "C": {"C"}, "G": {"G"}, "T": {"T"},
-        "R": {"A","G"}, "Y": {"C","T"}, "M": {"A","C"}, "K": {"G","T"},
-        "S": {"C","G"}, "W": {"A","T"}, "B": {"C","G","T"}, "V": {"A","C","G"},
-        "D": {"A","G","T"}, "H": {"A","C","T"}, "N": {"A","C","G","T"},
-    }
-
     region_up = region.upper()
     for start in range(len(region_up) - plen + 1):
         window = region_up[start:start + plen]
         mismatches = 0
         for rb, pb in zip(window, primer_up):
-            allowed = _iupac_sets.get(pb, {pb})
+            allowed = _IUPAC_SETS.get(pb, {pb})
             if rb not in allowed:
                 mismatches += 1
                 if mismatches > max_err:
