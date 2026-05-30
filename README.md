@@ -99,7 +99,7 @@ bash refs/build_coi_udb.sh
 ```
 
 **eKOI** (curated eukaryote COI, small and fast):
-1. Download from [eKOI](https://doi.org/10.1101/2024.12.05.626972) the PR2-formatted FASTA
+1. Download from [eKOI]([https://doi.org/10.1101/2024.12.05.626972](https://github.com/rubenmiguens/eKOI_taxonomy_database)) the PR2-formatted FASTA
 2. Convert to SINTAX format and build UDB:
 ```bash
 python3 refs/convert_ekoi_to_sintax.py --input refs/eKOI_raw.fasta --output refs/eKOI_COI_SINTAX.fasta
