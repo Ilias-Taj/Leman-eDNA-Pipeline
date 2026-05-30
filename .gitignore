@@ -4,15 +4,7 @@
 /env/
 
 # Pipeline outputs (large, regenerable)
-/out/*/barcode*/
-/out/*/temp_clustering/
-/out/*/merged/
-/out/*/taxonomy/
-/out/*/taxonomy_summary/
-/out/*/blast_results/
-/out/*/logs/
-/out/*/unclassified/
-/out/logs/
+/out/*
 
 # Raw sequencing data (too large for git)
 /data/*
