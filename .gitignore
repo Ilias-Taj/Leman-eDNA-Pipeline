@@ -15,8 +15,7 @@
 /out/logs/
 
 # Raw sequencing data (too large for git)
-/data/**/*.fastq
-/data/**/*.fastq.gz
+/data/*
 
 # Reference databases (large binary files - rebuild with setup scripts)
 /refs/*.udb
@@ -47,10 +46,3 @@ Thumbs.db
 *.swp
 *.swo
 *~
-
-# Presentation files (separate from pipeline)
-/presentation/
-*.pptx
-
-# Presentation notebook (not part of pipeline)
-Presentation_eDNA_Results.ipynb
