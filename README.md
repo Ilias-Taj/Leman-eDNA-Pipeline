@@ -17,7 +17,7 @@ This pipeline processes multi-marker amplicon sequencing data (18S rRNA, COI, an
 | **PR2 v5.1.1** | 18S rRNA | ~240K seqs | Protists, ciliates, diatoms, plankton | `bash refs/setup_pr2_18s.sh` |
 | **SILVA v123** | 18S rRNA | ~1.1 GB UDB | Broad 18S coverage | Manual (see below) |
 | **MIDORI2** | COI | 3.1M seqs, 9.4 GB | Broadest COI, best at species level | Manual + `bash refs/build_coi_udb.sh` |
-| **eKOI** | COI | 66 MB | Curated eukaryote COI, fast | Manual + convert script |
+| **eKOI** | COI | 66 MB | Curated eukaryote COI, fast | `bash refs/setup_ekoi_coi.sh` |
 | **Porter CO1 v5.1** | COI | 2.2M seqs, 6.8 GB | Good intermediate COI coverage | `bash refs/setup_porter_coi.sh` |
 
 ## Key Features
@@ -99,12 +99,10 @@ bash refs/build_coi_udb.sh
 ```
 
 **eKOI** (curated eukaryote COI, small and fast):
-1. Download from [eKOI](https://doi.org/10.1101/2024.12.05.626972) the PR2-formatted FASTA
-2. Convert to SINTAX format and build UDB:
 ```bash
-python3 refs/convert_ekoi_to_sintax.py --input refs/eKOI_raw.fasta --output refs/eKOI_COI_SINTAX.fasta
-./env/bin/vsearch --makeudb_usearch refs/eKOI_COI_SINTAX.fasta --output refs/eKOI_COI.udb
+bash refs/setup_ekoi_coi.sh
 ```
+Downloads from [GitHub](https://github.com/rubenmiguens/eKOI_taxonomy_database), converts to SINTAX format, and builds UDB automatically.
 
 **Porter CO1 v5.1** (pre-built, good intermediate coverage):
 ```bash
