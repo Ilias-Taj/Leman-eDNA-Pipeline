@@ -279,7 +279,7 @@ def main():
                         if len(parts) > 2:
                             species_name = " ".join(parts[0:3])
                     
-                    ident = f"{100 * hsp.identities / hsp.align_length:.1f}%"
+                    ident = f"{100 * hsp.identities / hsp.align_length:.1f}"
                     blast_results[otu_id] = {
                         "species": species_name,
                         "identity": ident,
