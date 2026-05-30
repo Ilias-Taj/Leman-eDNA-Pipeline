@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 # run_full_pipeline.sh
-# Full eDNA metabarcoding pipeline: quality filtering ÔåÆ marker classification ÔåÆ clustering + chimera detection ÔåÆ abundance matrices
+# Full eDNA metabarcoding pipeline: quality filtering -> marker classification -> clustering + chimera detection -> abundance matrices
 # Processes already basecalled & demultiplexed FASTQ files.
 # Changelog:
 #   2026-05-12  Reorder steps: summary (step 6) before BLAST (step 7)
@@ -204,7 +204,7 @@ log_message "Processing all ${#samples[@]} samples with full timing and resource
 update_progress "Processing all ${#samples[@]} samples..."
 echo ""
 
-# ÔöÇÔöÇ Per-barcode preprocessing loop ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+# -- Per-barcode preprocessing loop ------------------------------------------
 # Each barcode directory contains one or more FASTQ chunks from MinION.
 # We concatenate them and run quality filtering (filtlong) per sample.
 for sample in "${samples[@]}"; do
@@ -274,8 +274,8 @@ for sample in "${samples[@]}"; do
   preproc_times+=($preproc_time)
   total_times+=($sample_total)
 
-  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB ÔåÆ ${filtered_reads_mb}MB)" | tee -a "$logf"
-  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB ÔåÆ ${filtered_reads_mb}MB)"
+  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB -> ${filtered_reads_mb}MB)" | tee -a "$logf"
+  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB -> ${filtered_reads_mb}MB)"
   echo "Finished preprocessing: $sample" | tee -a "$logf"
 done
 
@@ -285,7 +285,7 @@ echo "GLOBAL MARKER CLASSIFICATION & CLUSTERING"
 echo "======================================="
 echo ""
 
-# ÔöÇÔöÇ Global pipeline steps (operate on all barcodes together) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+# -- Global pipeline steps (operate on all barcodes together) ----------------
 
 # Step 2: Classify reads by marker based on amplicon length
 echo "[2/7] Classifying reads by marker..."
@@ -397,7 +397,7 @@ update_progress "[TAXONOMY] Starting taxonomy assignment..."
 taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
 
-# ÔöÇÔöÇ Resolve database paths ÔöÇÔöÇ
+# -- Resolve database paths --
 # These functions map short DB names (pr2, silva, midori2, ekoi, porter)
 # to actual .udb file paths. Called once per marker to build TAXONOMY_DB_ARGS.
 resolve_18s_db() {
