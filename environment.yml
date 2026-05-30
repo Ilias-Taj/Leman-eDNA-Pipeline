@@ -31,4 +31,4 @@ dependencies:
 
   # --- Pip Packages ---
   - pip:
-      - spoa             # SPOA consensus generation (clustering step)
+      - pyspoa            # SPOA consensus generation (clustering step)
