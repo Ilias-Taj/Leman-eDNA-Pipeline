@@ -120,8 +120,8 @@ conda activate ./env
 # Run Water (18S+COI) then Soil (JEDI+COI) sequentially
 bash scripts/run_both_datasets.sh
 
-# Override databases via environment variables:
-DB_18S=silva DB_COI=ekoi bash scripts/run_both_datasets.sh
+# Override databases via CLI arguments:
+bash scripts/run_both_datasets.sh --db_18S silva --db_COI ekoi
 ```
 
 ### Single Dataset
