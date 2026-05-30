@@ -121,7 +121,7 @@ conda activate ./env
 bash scripts/run_both_datasets.sh
 
 # Override databases via CLI arguments:
-bash scripts/run_both_datasets.sh --db_18S silva --db_COI ekoi
+bash scripts/run_both_datasets.sh --db_18S silva --db_COI ekoi --db_JEDI silva
 ```
 
 ### Single Dataset
@@ -144,6 +144,13 @@ bash scripts/run_full_pipeline.sh \
     --root data/Water_eDNA_18S_COI_14_01_26/fastq_pass \
     --markers 18S,COI \
     --db_18S silva --db_COI ekoi \
+    --threads 14
+
+# Soil with SILVA + eKOI:
+bash scripts/run_full_pipeline.sh \
+    --root data/Soil_eDNA_JEDI_COI_14_01_26/fastq_pass \
+    --markers JEDI,COI \
+    --db_JEDI silva --db_COI ekoi \
     --threads 14
 ```
 
