@@ -9,14 +9,13 @@ cd "$(dirname "$0")/.."
 # ── Porter COI version (update when new releases appear) ──
 # Releases: https://github.com/terrimporter/CO1Classifier/releases
 PORTER_VERSION="${PORTER_VERSION:-5.1.0}"
-PORTER_SHORT="${PORTER_VERSION%.*}${PORTER_VERSION##*.}"  # 5.1.0 -> 510 (for filenames)
 
 echo "=== Downloading Porter CO1 v${PORTER_VERSION} SINTAX database ==="
 echo "Size: ~1.96 GB (compressed)"
 echo ""
 
 ZIP_FILE="refs/SINTAX_COIv${PORTER_VERSION}.zip"
-UDB_FILE="refs/porter_COI_v${PORTER_SHORT%0}.udb"
+UDB_FILE="refs/porter_COI.udb"
 
 if [[ ! -f "$ZIP_FILE" ]]; then
     wget -c "https://github.com/terrimporter/CO1Classifier/releases/download/SINTAX-COI-v${PORTER_VERSION}/SINTAX_COIv${PORTER_VERSION}.zip" \

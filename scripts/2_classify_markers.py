@@ -56,21 +56,21 @@ VALID_MARKERS = list(MARKER_RANGES.keys())
 
 # Short name → filename inside refs/
 _DB_NAME_MAP = {
-    "pr2":     "pr2_18S_v511.udb",
+    "pr2":     "pr2_18S.udb",
     "silva":   "silva_18s_v123.udb",
     "midori2": "midori2_COI.udb",
     "midori":  "midori2_COI.udb",
     "ekoi":    "eKOI_COI.udb",
-    "porter":  "porter_COI_v51.udb",
+    "porter":  "porter_COI.udb",
 }
 
 # Auto-detect fallback order when no DB is specified
 _MARKER_DEFAULT_DBS = {
-    "18S":  ["pr2_18S_v511.udb", "silva_18s_v123.udb",
+    "18S":  ["pr2_18S.udb", "silva_18s_v123.udb",
              "pr2_version_5.1.1_SSU_dada2.fasta.gz"],
-    "COI":  ["midori2_COI.udb", "eKOI_COI.udb", "porter_COI_v51.udb",
+    "COI":  ["midori2_COI.udb", "eKOI_COI.udb", "porter_COI.udb",
              "eKOI_COI_SINTAX.fasta"],
-    "JEDI": ["pr2_18S_v511.udb", "silva_18s_v123.udb"],
+    "JEDI": ["pr2_18S.udb", "silva_18s_v123.udb"],
 }
 
 

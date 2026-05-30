@@ -10,7 +10,7 @@ echo "=== Setting up PR2 v${PR2_VERSION} 18S database ==="
 
 FASTA_GZ="refs/pr2_version_${PR2_VERSION}_SSU_dada2.fasta.gz"
 SINTAX_FASTA="refs/pr2_18S_SINTAX.fasta"
-UDB_FILE="refs/pr2_18S_v${PR2_VERSION//\.}.udb"
+UDB_FILE="refs/pr2_18S.udb"
 
 # Download if not present
 if [[ ! -f "$FASTA_GZ" ]]; then

@@ -68,10 +68,10 @@ resolve_db() {
 
   case "$choice" in
     silva|SILVA)                      echo "refs/silva_18s_v123.udb" ;;
-    pr2|PR2)                          echo "refs/pr2_18S_v511.udb" ;;
+    pr2|PR2)                          echo "refs/pr2_18S.udb" ;;
     midori2|MIDORI2|midori|MIDORI)    echo "refs/midori2_COI.udb" ;;
     eKOI|ekoi)                        echo "refs/eKOI_COI.udb" ;;
-    porter|PORTER|porter_coi)         echo "refs/porter_COI_v51.udb" ;;
+    porter|PORTER|porter_coi)         echo "refs/porter_COI.udb" ;;
     *)
       if [ -f "$choice" ]; then
         echo "$choice"

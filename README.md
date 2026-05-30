@@ -203,7 +203,7 @@ python3 scripts/4_merge_otu_tables_by_marker.py --input_dir "out/run_name"
 # Step 5: Assign Taxonomy
 python3 scripts/5_assign_taxonomy.py \
     --input_dir "out/run_name" \
-    --db_18S refs/pr2_18S_v511.udb \
+    --db_18S refs/pr2_18S.udb \
     --db_COI refs/midori2_COI.udb \
     --threads 12
 

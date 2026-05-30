@@ -412,13 +412,13 @@ resolve_18s_db() {
   local choice="$1"
   if [ -n "$choice" ]; then
     case "$choice" in
-      pr2|PR2)     echo "refs/pr2_18S_v511.udb" ;;
+      pr2|PR2)     echo "refs/pr2_18S.udb" ;;
       silva|SILVA) echo "refs/silva_18s_v123.udb" ;;
       *) [ -f "$choice" ] && echo "$choice" || { echo "ERROR: Unknown 18S DB '$choice'" >&2; exit 1; } ;;
     esac
   else
     # Default: prefer PR2, fall back to SILVA
-    if [ -f refs/pr2_18S_v511.udb ]; then echo "refs/pr2_18S_v511.udb"
+    if [ -f refs/pr2_18S.udb ]; then echo "refs/pr2_18S.udb"
     elif [ -f refs/silva_18s_v123.udb ]; then echo "refs/silva_18s_v123.udb"
     else echo ""; fi
   fi
@@ -430,14 +430,14 @@ resolve_coi_db() {
     case "$choice" in
       midori2|MIDORI2|midori) echo "refs/midori2_COI.udb" ;;
       ekoi|eKOI)              echo "refs/eKOI_COI.udb" ;;
-      porter|PORTER)          echo "refs/porter_COI_v51.udb" ;;
+      porter|PORTER)          echo "refs/porter_COI.udb" ;;
       *) [ -f "$choice" ] && echo "$choice" || { echo "ERROR: Unknown COI DB '$choice'" >&2; exit 1; } ;;
     esac
   else
     # Default: prefer MIDORI2, fall back to eKOI, then Porter
     if [ -f refs/midori2_COI.udb ]; then echo "refs/midori2_COI.udb"
     elif [ -f refs/eKOI_COI.udb ]; then echo "refs/eKOI_COI.udb"
-    elif [ -f refs/porter_COI_v51.udb ]; then echo "refs/porter_COI_v51.udb"
+    elif [ -f refs/porter_COI.udb ]; then echo "refs/porter_COI.udb"
     else echo ""; fi
   fi
 }
