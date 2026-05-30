@@ -14,7 +14,7 @@ Usage:
     python scripts/1_run_preprocessing.py \
         --input_files data/Water_eDNA_18S_COI_14_01_26/fastq_pass/barcode01/*.fastq.gz \
         --output_dir out/Water_eDNA_18S_COI_14_01_26/barcode01 \
-        --min_mean_q 20
+        --min_mean_q 15
 
 Output:
     Creates filtered_reads.fastq.gz in the output directory
@@ -43,13 +43,13 @@ def main():
     )
     parser.add_argument("--input_files", required=True, nargs='+',
                         help="Path(s) to input FASTQ or FASTQ.gz file(s)")
-    parser.add_argument("--output_dir", required=True, 
+    parser.add_argument("--output_dir", required=True,
                         help="Output directory (will be created if needed)")
-    parser.add_argument("--min_length", type=int, default=0, 
+    parser.add_argument("--min_length", type=int, default=0,
                         help="Minimum read length (0=no length filter, default: 0)")
-    parser.add_argument("--min_mean_q", type=int, default=20, 
-                        help="Minimum mean quality score (default: 20)")
-    parser.add_argument("--keep_percent", type=float, default=100.0, 
+    parser.add_argument("--min_mean_q", type=int, default=15,
+                        help="Minimum mean quality score (default: 15)")
+    parser.add_argument("--keep_percent", type=float, default=100.0,
                         help="Keep top N%% of reads by quality (default: 100)")
 
     args = parser.parse_args()
@@ -83,12 +83,12 @@ def main():
     if len(input_files) > 1:
         print(f"Concatenating {len(input_files)} files...")
         temp_concat = out_dir / "temp_concatenated.fastq.gz"
-        
+
         with gzip.open(temp_concat, 'wb') as outf:
             for f in input_files:
                 with gzip.open(f, 'rb') as inf:
                     shutil.copyfileobj(inf, outf)
-        
+
         input_for_filtlong = temp_concat
     else:
         input_for_filtlong = input_files[0]
@@ -112,7 +112,7 @@ def main():
             shutil.copyfileobj(proc.stdout, gzout)
             proc.stdout.close()
             ret = proc.wait()
-            
+
             if ret != 0:
                 print(f"ERROR: filtlong failed with code {ret}", file=sys.stderr)
                 sys.exit(ret)
@@ -120,7 +120,7 @@ def main():
     except Exception as e:
         print(f"ERROR during execution: {e}", file=sys.stderr)
         sys.exit(1)
-    
+
     finally:
         # Clean up temp file if we created one
         if len(input_files) > 1 and temp_concat.exists():

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# create_env.sh
-# Create a conda/mamba environment in the './env' folder.
-# Now uses the environment.yml file to install all tools.
+# create_env.sh — Create conda/mamba environment for the eDNA pipeline
+# Installs all dependencies defined in environment.yml
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_PREFIX="$ROOT_DIR/env"
@@ -17,16 +16,36 @@ fi
 if command -v mamba >/dev/null 2>&1; then
   echo "Found mamba. Creating environment at: $ENV_PREFIX"
   mamba env create -f "$YAML_FILE" -p "$ENV_PREFIX"
-else
-  if ! command -v conda >/dev/null 2>&1; then
-    echo "ERROR: neither mamba nor conda found on PATH. Please install Miniconda/Anaconda first." >&2
-    exit 2
-  fi
+elif command -v conda >/dev/null 2>&1; then
   echo "Using conda. Creating environment at: $ENV_PREFIX"
   conda env create -f "$YAML_FILE" -p "$ENV_PREFIX"
+else
+  echo "ERROR: neither mamba nor conda found on PATH." >&2
+  echo "Install Miniconda: https://docs.conda.io/en/latest/miniconda.html" >&2
+  exit 2
 fi
 
 echo ""
-echo "Environment successfully created at: $ENV_PREFIX"
-echo "Tools installed: filtlong, vsearch, samtools, biopython, pandas, matplotlib, seaborn, ipykernel"
-echo "Activate it with: conda activate $ENV_PREFIX"
+echo "═══════════════════════════════════════════════════════════════"
+echo " Environment created at: $ENV_PREFIX"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "Conda packages installed:"
+echo "  filtlong, vsearch, samtools, cutadapt, biopython, pandas,"
+echo "  matplotlib, seaborn, numpy, ipykernel, jupyter"
+echo ""
+echo "Pip packages installed:"
+echo "  spoa (SPOA consensus generation)"
+echo ""
+echo "Activate with:"
+echo "  conda activate $ENV_PREFIX"
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo " External tools (install manually in tools/):"
+echo "═══════════════════════════════════════════════════════════════"
+echo "  minimap2 v2.30+  — https://github.com/lh3/minimap2/releases"
+echo "                     Download pre-compiled binary for your platform"
+echo ""
+echo "  isONclust3       — https://github.com/aljpetri/isONclust3"
+echo "                     cargo install isONclust3 (requires Rust toolchain)"
+echo "═══════════════════════════════════════════════════════════════"

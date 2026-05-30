@@ -2,8 +2,11 @@
 """
 6_blast_top_otus.py - BLAST TOP OTUs AGAINST NCBI (ROBUST VERSION)
 
-Extracts the top N most abundant OTUs from the abundance matrix
+Extracts the top N OTUs (by abundance or confidence) from the abundance matrix
 and runs remote BLAST searches against NCBI GenBank for taxonomy validation.
+
+Output filename includes the selection criterion:
+    blast_top{N}_{select_by}_{marker}.txt
 
 Robustly handles ID mapping from OTU names to consensus sequences by
 checking multiple candidate reads until finding one that matches the FASTA file.
@@ -11,29 +14,42 @@ checking multiple candidate reads until finding one that matches the FASTA file.
 Prerequisite: Run 4_merge_otu_tables_by_marker.py first
 
 Usage:
-    # BLAST top 10 COI OTUs
+    # BLAST top 10 COI OTUs by abundance (default)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_COI.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_COI_clean.fasta \
         --otu_assignment out/Water_eDNA_18S_COI_14_01_26/global_otu_assignment_COI.txt \
         --marker COI \
         --top_n 10
-    
-    # BLAST top 10 18S OTUs
+
+    # BLAST top 10 18S OTUs by confidence (validates pipeline calls against NCBI)
     python scripts/6_blast_top_otus.py \
         --matrix out/Water_eDNA_18S_COI_14_01_26/merged/otu_relative_abundance_18S.csv \
         --fasta out/Water_eDNA_18S_COI_14_01_26/temp_clustering/consensus_18S_clean.fasta \
         --otu_assignment out/Water_eDNA_18S_COI_14_01_26/global_otu_assignment.txt \
         --marker 18S \
-        --top_n 10
+        --top_n 10 \
+        --select_by confidence \
+        --taxonomy_summary out/Water_eDNA_18S_COI_14_01_26/taxonomy_summary/18S/pr2/comprehensive_taxonomy_18S.csv
 
 Output:
-    Results are saved to {output_dir}/blast_top{N}_{marker}.txt
+    Results are saved to {output_dir}/blast_top{N}_{select_by}_{marker}.txt
     Default output_dir: {input_dir}/blast_results/
 
 Note:
     BLAST queries are rate-limited (3 seconds between queries) to comply
     with NCBI usage policies. Expect ~1-2 minutes per sequence.
+
+Changelog:
+    2025-05-13  Split BLAST into two runs: top 10 by abundance + top 10 by confidence.
+                Output filename now includes selection criterion (abundance/confidence).
+    2025-05-12  Reorder: runs as step 7 (after summary). Adds --update_summary
+                to write BLAST results back into the comprehensive taxonomy CSV.
+                Add 5-min timeout per NCBI query (signal.alarm) to prevent hangs.
+                Change --select_by confidence to pick highest confidence OTUs
+                (validates best SINTAX calls against NCBI).
+    2025-05-11  Fix isONclust3 FASTA header support in get_sequence_for_otu().
+                Add --select_by confidence mode (reads taxonomy summary CSV).
 """
 
 import pandas as pd
@@ -42,7 +58,34 @@ from Bio import SeqIO
 import argparse
 import sys
 import time
+import signal
 from pathlib import Path
+
+
+
+class BlastTimeout(Exception):
+    """Raised when a BLAST query exceeds the allowed time."""
+    pass
+
+
+BLAST_TIMEOUT_SECONDS = 300  # 5 minutes per query
+
+
+def _run_blast_with_timeout(seq, timeout=BLAST_TIMEOUT_SECONDS):
+    """Run a single BLAST query with a timeout (Unix signal-based)."""
+    def _alarm_handler(signum, frame):
+        raise BlastTimeout(f"BLAST query timed out after {timeout}s")
+
+    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(timeout)
+    try:
+        result_handle = NCBIWWW.qblast("blastn", "nt", seq, hitlist_size=1)
+        blast_record = NCBIXML.read(result_handle)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+    return blast_record
 
 def load_otu_mapping_robust(otu_assignment_file):
     """
@@ -72,34 +115,35 @@ def load_otu_mapping_robust(otu_assignment_file):
 
 def get_sequence_for_otu(fasta_path, otu_id, otu_to_reads_map):
     """
-    Scans FASTA file to find a sequence matching one of the reads assigned to this OTU.
+    Scans FASTA file for a sequence matching this OTU.
+
+    Supports two FASTA header formats:
+      - isONclust3: >centroid=OTU_18S_000001;seqs=123  (OTU ID in header directly)
+      - Fallback:    >centroid=uuid|barcode|marker;seqs=100  (read UUID in header)
     Returns (sequence, found_id) or (None, None) if not found.
     """
-    if otu_id not in otu_to_reads_map:
-        return None, None
-    
-    candidates = otu_to_reads_map[otu_id]
-    
+    candidates = otu_to_reads_map.get(otu_id, set())
+
     with open(fasta_path, "r") as handle:
         for record in SeqIO.parse(handle, "fasta"):
-            # VSEARCH consensus headers look like: >centroid=uuid|barcode|marker;size=100
             header_clean = record.id.split(';')[0].replace('centroid=', '')
-            
-            # Try matching different parts:
-            # 1. Full ID match (uuid|barcode|marker)
+
+            # isONclust3: header IS the OTU ID (e.g. OTU_18S_000001)
+            if header_clean == otu_id:
+                return str(record.seq), header_clean
+
+            # Fallback: header is a read UUID, match via otu_to_reads mapping
             if header_clean in candidates:
                 return str(record.seq), header_clean
-            
-            # 2. Just the UUID part (before first |)
+
             uuid_part = header_clean.split('|')[0]
             if uuid_part in candidates:
                 return str(record.seq), uuid_part
-            
-            # 3. Try any candidate that starts with this UUID
+
             for candidate in candidates:
                 if header_clean.startswith(candidate) or candidate.startswith(uuid_part):
                     return str(record.seq), header_clean
-    
+
     return None, None
 
 def main():
@@ -115,11 +159,23 @@ def main():
                         help="Path to global OTU assignment file for OTU-to-centroid mapping")
     parser.add_argument("--marker", required=True, 
                         help="Marker name (18S or COI)")
-    parser.add_argument("--top_n", type=int, default=10, 
-                        help="Number of top abundant OTUs to BLAST (default: 10)")
-    parser.add_argument("--output_dir", default=None, 
+    parser.add_argument("--top_n", type=int, default=10,
+                        help="Number of OTUs to BLAST (default: 10)")
+    parser.add_argument("--select_by", choices=["abundance", "confidence"], default="abundance",
+                        help="Selection criterion: 'abundance' (most reads) or 'confidence' "
+                             "(highest SINTAX species-level confidence — best taxonomy calls, "
+                             "validates pipeline performance against NCBI). Default: abundance.")
+    parser.add_argument("--taxonomy_summary", default=None,
+                        help="Path to comprehensive_taxonomy_*.csv (required when --select_by confidence)")
+    parser.add_argument("--output_dir", default=None,
                         help="Output directory for results (default: {input_dir}/blast_results/)")
+    parser.add_argument("--update_summary", default=None,
+                        help="Path to comprehensive_taxonomy CSV to update with BLAST results")
     args = parser.parse_args()
+
+    if args.select_by == "confidence" and not args.taxonomy_summary:
+        print("ERROR: --taxonomy_summary is required when using --select_by confidence", file=sys.stderr)
+        sys.exit(1)
 
     # Set up output directory
     if args.output_dir:
@@ -128,7 +184,7 @@ def main():
         output_dir = Path(args.matrix).parent.parent / "blast_results"
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    output_file = output_dir / f"blast_top{args.top_n}_{args.marker}.txt"
+    output_file = output_dir / f"blast_top{args.top_n}_{args.select_by}_{args.marker}.txt"
 
     print(f"--- BLASTing Top {args.top_n} {args.marker} OTUs ---")
     print(f"Results will be saved to: {output_file}")
@@ -138,19 +194,34 @@ def main():
     otu_to_reads = load_otu_mapping_robust(args.otu_assignment)
     print(f"  Loaded {len(otu_to_reads)} OTU mappings")
 
-    # 2. Load Matrix and find Top OTUs
+    # 2. Load Matrix and select Top OTUs
     try:
         df = pd.read_csv(args.matrix, index_col=0)
-        # Sum all sample columns
         df['total_reads'] = df.sum(axis=1)
-        
-        # Sort and take top N
-        top_otus = df.sort_values('total_reads', ascending=False).head(args.top_n)
+
+        if args.select_by == "confidence":
+            # Load taxonomy summary to get species-level confidence scores
+            tax = pd.read_csv(args.taxonomy_summary, index_col=0)
+            conf_col = next((c for c in tax.columns if c.endswith('_Species_Conf')), None)
+            if conf_col is None:
+                print("ERROR: No *_Species_Conf column found in taxonomy summary", file=sys.stderr)
+                sys.exit(1)
+            # Join confidence onto abundance df; keep only OTUs with assigned taxonomy
+            df = df.join(tax[[conf_col, 'Total_Abundance']], how='left')
+            df = df[df[conf_col].notna()]
+            # Sort by confidence descending (highest confidence = best calls to validate against NCBI)
+            top_otus = df.sort_values(conf_col, ascending=False).head(args.top_n)
+            print(f"Selected Top {args.top_n} OTUs by highest {conf_col} "
+                  f"(range {top_otus[conf_col].min():.2f}–{top_otus[conf_col].max():.2f}) "
+                  f"from {len(df)} assigned OTUs.")
+        else:
+            # Default: top N by total read abundance
+            top_otus = df.sort_values('total_reads', ascending=False).head(args.top_n)
+            print(f"Selected Top {args.top_n} OTUs by abundance from {len(df)} total.")
+
         top_ids = list(top_otus.index)
-        
-        print(f"Identified Top {args.top_n} OTUs (from {len(df)} total).")
     except Exception as e:
-        print(f"Error loading matrix: {e}", file=sys.stderr)
+        print(f"Error loading matrix/taxonomy: {e}", file=sys.stderr)
         sys.exit(1)
 
     # 3. Extract sequences from FASTA for top OTUs (only ~10, no indexing needed)
@@ -166,6 +237,7 @@ def main():
 
     # 4. Run Remote BLAST
     print("\nStarting Remote BLAST (This takes 1-2 minutes per sequence)...")
+    blast_results = {}  # otu_id -> {species, identity, evalue}
     
     # Open output file for writing
     with open(output_file, 'w') as out_f:
@@ -192,10 +264,9 @@ def main():
             seq = sequences[otu_id]
             
             try:
-                # BLASTN against 'nt' (Nucleotide collection)
+                # BLASTN against 'nt' (Nucleotide collection) with timeout
                 print(f"  BLASTing {otu_id}...", end=" ", flush=True)
-                result_handle = NCBIWWW.qblast("blastn", "nt", seq, hitlist_size=1)
-                blast_record = NCBIXML.read(result_handle)
+                blast_record = _run_blast_with_timeout(seq)
                 
                 if blast_record.alignments:
                     alignment = blast_record.alignments[0]
@@ -208,7 +279,12 @@ def main():
                         if len(parts) > 2:
                             species_name = " ".join(parts[0:3])
                     
-                    ident = f"{100 * hsp.identities / hsp.align_length:.1f}%"
+                    ident = f"{100 * hsp.identities / hsp.align_length:.1f}"
+                    blast_results[otu_id] = {
+                        "species": species_name,
+                        "identity": ident,
+                        "evalue": f"{hsp.expect:.2e}",
+                    }
                     print(f"done")
                     result_line = f"{otu_id:<20} | {count:<10.4f} | {species_name:<40} | {ident:<10} | {hsp.expect:.2e}\n"
                     print(result_line, end="")
@@ -222,6 +298,12 @@ def main():
                 # Be polite to NCBI servers
                 time.sleep(3)
                 
+            except BlastTimeout:
+                print(f"TIMEOUT")
+                result_line = f"{otu_id:<20} | {count:<10.4f} | TIMEOUT                                 | -          | -\n"
+                print(result_line, end="")
+                out_f.write(result_line)
+
             except Exception as e:
                 print(f"error")
                 result_line = f"{otu_id:<20} | ERROR: {e}\n"
@@ -229,6 +311,31 @@ def main():
                 out_f.write(result_line)
     
     print(f"\n[OK] Results saved to: {output_file}")
+
+    # 5. Optionally update the comprehensive taxonomy summary CSV
+    if args.update_summary and blast_results:
+        print(f"\nUpdating summary CSV: {args.update_summary}")
+        try:
+            df_summary = pd.read_csv(args.update_summary)
+            id_col = "OTU_ID" if "OTU_ID" in df_summary.columns else df_summary.columns[0]
+
+            for col in ["NCBI_TopHit", "NCBI_Identity", "NCBI_Evalue"]:
+                if col not in df_summary.columns:
+                    df_summary[col] = ""
+
+            updated = 0
+            for otu_id, result in blast_results.items():
+                mask = df_summary[id_col] == otu_id
+                if mask.any():
+                    df_summary.loc[mask, "NCBI_TopHit"] = result["species"]
+                    df_summary.loc[mask, "NCBI_Identity"] = result["identity"]
+                    df_summary.loc[mask, "NCBI_Evalue"] = result["evalue"]
+                    updated += 1
+
+            df_summary.to_csv(args.update_summary, index=False)
+            print(f"  Updated {updated} OTUs in summary CSV")
+        except Exception as e:
+            print(f"  [WARN] Failed to update summary CSV: {e}")
 
 if __name__ == "__main__":
     main()

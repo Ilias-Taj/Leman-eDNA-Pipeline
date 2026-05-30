@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -eo pipefail
 # run_full_pipeline.sh
-# Full eDNA metabarcoding pipeline: quality filtering → marker classification → clustering + chimera detection → abundance matrices
+# Full eDNA metabarcoding pipeline: quality filtering -> marker classification -> clustering + chimera detection -> abundance matrices
 # Processes already basecalled & demultiplexed FASTQ files.
+# Changelog:
+#   2025-05-12  Reorder steps: summary (step 6) before BLAST (step 7)
+#               Summary CSV created with blank NCBI columns first,
+#               BLAST runs after and updates CSV via --update_summary.
+#               BLAST now uses --select_by confidence (highest SINTAX conf)
+#               since summary CSV exists before BLAST runs.
+#   2025-05-11  Replace Porechop ABI with cutadapt for primer trimming (step 2b).
+#               Add primer-based reclassification (Phase 1) before trimming.
+#               Fix stale "Porechop ABI" references in comments.
 # Writes per-sample logs to out/logs/<sample>.log and produces outputs under out/<sample>/
 
 # Default to the delivered eDNA run; override with --root if needed
@@ -13,8 +22,11 @@ MIN_READS=20
 MAPQ=20 # MAPQ threshold for grouping reads
 KEEP_PERCENT=100
 MIN_LENGTH=0
-MIN_MEAN_Q=20
+MIN_MEAN_Q=15
 MARKERS="18S,COI" # Comma-separated markers: 18S,COI,JEDI (e.g. "JEDI,COI" for soil data)
+SKIP_TRIMMING=false
+SKIP_BLAST=false
+ISONCLUST3_PATH="./tools/isONclust3/target/release/isONclust3"
 
 # Database overrides (empty = auto-detect from refs/)
 DB_18S=""   # e.g. silva, pr2, or path to .udb
@@ -49,6 +61,9 @@ Options:
   --db_18S DB        18S database: pr2 (default), silva, or path to .udb
   --db_COI DB        COI database: midori2 (default), ekoi, porter, or path to .udb
   --db_JEDI DB       JEDI database: pr2 (default), silva, or path to .udb
+  --isonclust3 PATH  Path to isONclust3 binary (default: tools/isONclust3/...)
+  --skip_trimming    Skip primer trimming step 2b (default: false)
+  --skip_blast       Skip BLAST validation step 7 (default: false)
   --threads N        Threads for minimap2/samtools (default: $THREADS)
   --min_reads N      Minimum reads to attempt consensus (default: $MIN_READS)
   --mapq N           MAPQ threshold for grouping reads (default: $MAPQ)
@@ -90,6 +105,9 @@ while [[ $# -gt 0 ]]; do
     --db_18S) DB_18S="$2"; shift 2;;
     --db_COI) DB_COI="$2"; shift 2;;
     --db_JEDI) DB_JEDI="$2"; shift 2;;
+    --isonclust3) ISONCLUST3_PATH="$2"; shift 2;;
+    --skip_trimming) SKIP_TRIMMING=true; shift;;
+    --skip_blast) SKIP_BLAST=true; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 1;;
   esac
@@ -138,8 +156,8 @@ log_message "======================================="
 log_message "Threads/jobs per task: $THREADS"
 log_message "Active markers: $MARKERS"
 log_message "Quality threshold (min_mean_q): $MIN_MEAN_Q"
-log_message "Clustering method: VSEARCH (global sequence alignment)"
-log_message "Clustering identity threshold: 0.95"
+log_message "Clustering method: isONclust3 + SPOA consensus"
+log_message "Chimera removal: VSEARCH uchime_denovo"
 log_message ""
 
 # Timing tracking - arrays to collect per-barcode stats
@@ -186,7 +204,7 @@ log_message "Processing all ${#samples[@]} samples with full timing and resource
 update_progress "Processing all ${#samples[@]} samples..."
 echo ""
 
-# ── Per-barcode preprocessing loop ──────────────────────────────────────────
+# -- Per-barcode preprocessing loop ------------------------------------------
 # Each barcode directory contains one or more FASTQ chunks from MinION.
 # We concatenate them and run quality filtering (filtlong) per sample.
 for sample in "${samples[@]}"; do
@@ -256,8 +274,8 @@ for sample in "${samples[@]}"; do
   preproc_times+=($preproc_time)
   total_times+=($sample_total)
 
-  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB → ${filtered_reads_mb}MB)" | tee -a "$logf"
-  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB → ${filtered_reads_mb}MB)"
+  echo "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB -> ${filtered_reads_mb}MB)" | tee -a "$logf"
+  log_message "[STATS] $sample - Preprocessing: ${preproc_time}s (${raw_reads_mb}MB -> ${filtered_reads_mb}MB)"
   echo "Finished preprocessing: $sample" | tee -a "$logf"
 done
 
@@ -267,7 +285,7 @@ echo "GLOBAL MARKER CLASSIFICATION & CLUSTERING"
 echo "======================================="
 echo ""
 
-# ── Global pipeline steps (operate on all barcodes together) ────────────────
+# -- Global pipeline steps (operate on all barcodes together) ----------------
 
 # Step 2: Classify reads by marker based on amplicon length
 echo "[2/7] Classifying reads by marker..."
@@ -279,9 +297,15 @@ log_message "[2/7] Classifying reads by marker..."
 update_progress "[MARKER] Starting marker classification..."
 marker_start=$(date +%s)
 marker_mem_start=$(get_memory_usage)
+_MM2_ARGS="--use_minimap2 --refs_dir refs/"
+[ -n "$DB_18S" ]  && _MM2_ARGS="$_MM2_ARGS --db_18S $DB_18S"
+[ -n "$DB_COI" ]  && _MM2_ARGS="$_MM2_ARGS --db_COI $DB_COI"
+[ -n "$DB_JEDI" ] && _MM2_ARGS="$_MM2_ARGS --db_JEDI $DB_JEDI"
+# shellcheck disable=SC2086
 if ! "$ENV_PREFIX/bin/python3" scripts/2_classify_markers.py \
     --input_dir "$OUTPUT_ROOT" \
-    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
+    --markers "$MARKERS" \
+    $_MM2_ARGS > "$OUTPUT_ROOT/logs/marker_classification.log" 2>&1; then
   echo "Marker classification failed (see $OUTPUT_ROOT/logs/marker_classification.log)" >&2
   log_message "[FAIL] Marker classification FAILED"
   exit 1
@@ -295,6 +319,29 @@ log_message "[OK] Marker classification complete (${marker_time}s, ${marker_mem_
 update_progress "[MARKER] Complete (${marker_time}s)"
 echo ""
 
+# Step 2b: Primer reclassification + trimming (cutadapt)
+echo "[2b/7] Primer reclassification + trimming (cutadapt)..."
+log_message "[2b/7] Trimming primer sequences..."
+update_progress "[TRIM] Starting primer trimming..."
+trim_start=$(date +%s)
+trim_mem_start=$(get_memory_usage)
+_TRIM_SKIP_ARG=""
+[ "${SKIP_TRIMMING:-false}" = "true" ] && _TRIM_SKIP_ARG="--skip"
+if ! "$ENV_PREFIX/bin/python3" scripts/2b_trim_primers.py \
+    --input_dir "$OUTPUT_ROOT" \
+    --markers "$MARKERS" \
+    --threads "$THREADS" \
+    $_TRIM_SKIP_ARG > "$OUTPUT_ROOT/logs/primer_trimming.log" 2>&1; then
+  echo "[WARN] Primer trimming step encountered errors (see $OUTPUT_ROOT/logs/primer_trimming.log) — continuing."
+  log_message "[WARN] Primer trimming had errors (non-fatal, continuing)"
+fi
+trim_end=$(date +%s)
+trim_time=$((trim_end - trim_start))
+echo "[OK] Primer trimming complete (${trim_time}s)"
+log_message "[OK] Primer trimming complete (${trim_time}s)"
+update_progress "[TRIM] Complete (${trim_time}s)"
+echo ""
+
 # Step 3: Run clustering separately for each marker
 echo "[3/7] Running global OTU clustering..."
 log_message "[3/7] Running global OTU clustering..."
@@ -305,9 +352,9 @@ export PATH="$ENV_PREFIX/bin:/opt/homebrew/bin:$PATH"
 if ! "$ENV_PREFIX/bin/python3" scripts/3_run_clustering_by_marker.py \
     --input_dir "$OUTPUT_ROOT" \
     --output_dir "$OUTPUT_ROOT" \
-    --identity 0.95 \
     --threads "$THREADS" \
-    --markers "$MARKERS" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
+    --markers "$MARKERS" \
+    --isonclust3 "$ISONCLUST3_PATH" > "$OUTPUT_ROOT/logs/global_clustering.log" 2>&1; then
   echo "Global clustering failed (see $OUTPUT_ROOT/logs/global_clustering.log)" >&2
   log_message "[FAIL] Global clustering FAILED"
   exit 1
@@ -350,7 +397,7 @@ update_progress "[TAXONOMY] Starting taxonomy assignment..."
 taxonomy_start=$(date +%s)
 taxonomy_mem_start=$(get_memory_usage)
 
-# ── Resolve database paths ──
+# -- Resolve database paths --
 # These functions map short DB names (pr2, silva, midori2, ekoi, porter)
 # to actual .udb file paths. Called once per marker to build TAXONOMY_DB_ARGS.
 resolve_18s_db() {
@@ -429,52 +476,21 @@ log_message "[OK] Taxonomy assignment complete (${taxonomy_time}s, ${taxonomy_me
 update_progress "[TAXONOMY] Complete (${taxonomy_time}s)"
 echo ""
 
-# Step 6: BLAST validation (optional, top 10 OTUs per active marker)
-echo "[6/7] Running BLAST validation (top 10 OTUs)..."
-log_message "[6/7] Running BLAST validation (top 10 OTUs)..."
-update_progress "[BLAST] Starting BLAST validation..."
-blast_start=$(date +%s)
-blast_mem_start=$(get_memory_usage)
-
-IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
-for bm in "${BLAST_MARKERS[@]}"; do
-  if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
-    echo "  BLASTing top 10 ${bm} OTUs..."
-    log_message "  BLASTing top 10 ${bm} OTUs..."
-    if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
-        --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
-        --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
-        --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
-        --marker "$bm" \
-        --top_n 10 > "$OUTPUT_ROOT/logs/blast_${bm}.log" 2>&1; then
-      echo "  [OK] ${bm} BLAST complete"
-      log_message "  [OK] ${bm} BLAST complete"
-    else
-      echo "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
-      log_message "  [WARN] ${bm} BLAST failed (non-critical, continuing...)"
-    fi
-  fi
-done
-blast_end=$(date +%s)
-blast_mem_end=$(get_memory_usage)
-blast_time=$((blast_end - blast_start))
-blast_mem_delta=$((blast_mem_end - blast_mem_start))
-echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
-log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
-update_progress "[BLAST] Complete (${blast_time}s)"
-echo ""
-
-# Step 7: Comprehensive taxonomy summary
-echo "[7/7] Generating comprehensive taxonomy summary..."
-log_message "[7/7] Generating comprehensive taxonomy summary..."
+# Step 6: Comprehensive taxonomy summary (creates CSV with blank BLAST columns)
+echo "[6/7] Generating comprehensive taxonomy summary..."
+log_message "[6/7] Generating comprehensive taxonomy summary..."
 update_progress "[SUMMARY] Starting comprehensive summary..."
 summary_start=$(date +%s)
 summary_mem_start=$(get_memory_usage)
+SUMMARY_BLAST_ARG=""
+if [ "${SKIP_BLAST:-false}" = "true" ] && [ -d "$OUTPUT_ROOT/blast_results" ]; then
+  SUMMARY_BLAST_ARG="--blast_dir $OUTPUT_ROOT/blast_results"
+fi
 if ! "$ENV_PREFIX/bin/python3" scripts/7_comprehensive_taxonomy_summary.py \
     --input_dir "$OUTPUT_ROOT" \
     --markers "$MARKERS" \
     $TAXONOMY_DB_ARGS \
-    --skip_blast > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
+    --skip_blast $SUMMARY_BLAST_ARG > "$OUTPUT_ROOT/logs/taxonomy_summary.log" 2>&1; then
   echo "Taxonomy summary failed (see $OUTPUT_ROOT/logs/taxonomy_summary.log)" >&2
   log_message "[FAIL] Taxonomy summary FAILED"
   exit 1
@@ -486,6 +502,65 @@ summary_mem_delta=$((summary_mem_end - summary_mem_start))
 echo "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
 log_message "[OK] Comprehensive summary complete (${summary_time}s, ${summary_mem_delta}MB memory)"
 update_progress "[SUMMARY] Complete (${summary_time}s)"
+echo ""
+
+# Step 7: BLAST validation (top 10 by abundance + top 10 by confidence per marker)
+if [ "${SKIP_BLAST:-false}" = "true" ]; then
+  echo "[7/7] Skipping BLAST validation (--skip_blast)"
+  log_message "[7/7] Skipping BLAST validation (--skip_blast)"
+else
+echo "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
+log_message "[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)..."
+update_progress "[BLAST] Starting BLAST validation..."
+blast_start=$(date +%s)
+blast_mem_start=$(get_memory_usage)
+
+IFS=',' read -ra BLAST_MARKERS <<< "$MARKERS"
+for bm in "${BLAST_MARKERS[@]}"; do
+  if [ -f "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" ]; then
+    _tax_csv=$(find "$OUTPUT_ROOT/taxonomy_summary/${bm}" -name "comprehensive_taxonomy_${bm}.csv" 2>/dev/null | head -1)
+
+    # Run 1: Top 10 by abundance
+    echo "  BLASTing top 10 ${bm} OTUs by abundance..."
+    log_message "  BLASTing top 10 ${bm} OTUs by abundance..."
+    if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
+        --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
+        --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
+        --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
+        --marker "$bm" --top_n 10 --select_by abundance \
+        ${_tax_csv:+--update_summary "$_tax_csv"} \
+        > "$OUTPUT_ROOT/logs/blast_abundance_${bm}.log" 2>&1; then
+      echo "  [OK] ${bm} abundance BLAST complete"
+    else
+      echo "  [WARN] ${bm} abundance BLAST failed (non-critical)"
+    fi
+
+    # Run 2: Top 10 by confidence (requires taxonomy summary)
+    if [ -n "$_tax_csv" ]; then
+      echo "  BLASTing top 10 ${bm} OTUs by confidence..."
+      log_message "  BLASTing top 10 ${bm} OTUs by confidence..."
+      if "$ENV_PREFIX/bin/python3" scripts/6_blast_top_otus.py \
+          --matrix "$OUTPUT_ROOT/merged/otu_relative_abundance_${bm}.csv" \
+          --fasta "$OUTPUT_ROOT/temp_clustering/consensus_${bm}_clean.fasta" \
+          --otu_assignment "$OUTPUT_ROOT/global_otu_assignment_${bm}.txt" \
+          --marker "$bm" --top_n 10 --select_by confidence \
+          --taxonomy_summary "$_tax_csv" --update_summary "$_tax_csv" \
+          > "$OUTPUT_ROOT/logs/blast_confidence_${bm}.log" 2>&1; then
+        echo "  [OK] ${bm} confidence BLAST complete"
+      else
+        echo "  [WARN] ${bm} confidence BLAST failed (non-critical)"
+      fi
+    fi
+  fi
+done
+blast_end=$(date +%s)
+blast_mem_end=$(get_memory_usage)
+blast_time=$((blast_end - blast_start))
+blast_mem_delta=$((blast_mem_end - blast_mem_start))
+echo "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+log_message "[OK] BLAST validation complete (${blast_time}s, ${blast_mem_delta}MB memory)"
+update_progress "[BLAST] Complete (${blast_time}s)"
+fi
 echo ""
 
 echo ""
@@ -547,8 +622,8 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Global clustering" "$cluster_time" "$((cluster_time * 100 / total_time))" "$cluster_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Abundance matrices" "$matrix_time" "$((matrix_time * 100 / total_time))" "$matrix_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Taxonomy assignment" "$taxonomy_time" "$((taxonomy_time * 100 / total_time))" "$taxonomy_mem_delta"
-  printf "%-30s %10ds (%3d%%) %+8dMB\n" "BLAST validation" "$blast_time" "$((blast_time * 100 / total_time))" "$blast_mem_delta"
   printf "%-30s %10ds (%3d%%) %+8dMB\n" "Comprehensive summary" "$summary_time" "$((summary_time * 100 / total_time))" "$summary_mem_delta"
+  printf "%-30s %10ds (%3d%%) %+8dMB\n" "BLAST validation" "$blast_time" "$((blast_time * 100 / total_time))" "$blast_mem_delta"
   echo "---------------------------------------"
   printf "%-30s %10ds (%3d%%)\n" "Total global steps" "$global_steps_time" "$((global_steps_time * 100 / total_time))"
   
@@ -577,7 +652,7 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   echo "======================================="
   echo "Abundance matrices:    $OUTPUT_ROOT/merged/"
   echo "Taxonomy assignments:  $OUTPUT_ROOT/taxonomy/"
-  echo "BLAST validation:      $OUTPUT_ROOT/blast_results/"
+  echo "BLAST validation:      $OUTPUT_ROOT/blast_results/ (abundance + confidence)"
   echo "Summary CSV:           $OUTPUT_ROOT/taxonomy_summary/"
   echo "Logs:                  $OUTPUT_ROOT/logs/"
 fi

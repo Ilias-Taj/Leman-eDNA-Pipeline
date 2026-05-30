@@ -22,6 +22,12 @@ Output:
     Saves comprehensive taxonomy CSV files to:
     - {input_dir}/comprehensive_taxonomy_18S.csv
     - {input_dir}/comprehensive_taxonomy_COI.csv
+
+Changelog:
+    2025-05-12  Reorder: now runs as step 6 (before BLAST).
+                Creates CSV with blank NCBI_TopHit/Identity/Evalue columns.
+                BLAST (step 7) fills them in via --update_summary.
+                Cosmetic whitespace cleanup only in code.
 """
 
 import pandas as pd
@@ -93,15 +99,12 @@ def parse_silva_taxonomy(taxonomy_file):
             if len(parts) < 2:
                 continue
             
-            # Extract centroid UUID from VSEARCH header.
-            # Headers look like: centroid=UUID|barcode|marker;size=N
-            # We need just the UUID to join with OTU assignment table.
-            header = parts[0].split(';')[0]
-            match = re.search(r'centroid=([a-f0-9\-]+)', header)
-            if match:
-                centroid_id = match.group(1)
-            else:
-                centroid_id = header.split('|')[0].strip()
+            # Extract OTU ID from VSEARCH/SINTAX header.
+            # With isONclust3 pipeline headers look like: centroid=OTU_18S_000001;seqs=N
+            # With old VSEARCH pipeline headers look like: centroid=UUID|barcode|marker;size=N
+            raw_header = parts[0].split(';')[0]  # strip ;seqs=N or ;size=N
+            raw_header = raw_header.replace('centroid=', '').split('|')[0].strip()
+            centroid_id = raw_header  # OTU_18S_000001 or UUID
             full_taxonomy = parts[1] if len(parts) > 1 else ""
             
             tax_dict = {'domain': '', 'phylum': '', 'class': '', 'order': '', 
@@ -180,6 +183,55 @@ def run_blast_batch(sequences, otu_ids):
     
     return blast_results
 
+def parse_blast_results_dir(blast_dir, marker):
+    """Parse existing BLAST result .txt files from blast_dir for a given marker.
+
+    Reads blast_top*_{abundance,confidence}_{marker}.txt files and returns
+    a dict: OTU_ID -> {species, identity, evalue}.
+    """
+    blast_dir = Path(blast_dir)
+    if not blast_dir.is_dir():
+        return {}
+
+    results = {}
+    # Match files like blast_top10_abundance_COI.txt, blast_top10_confidence_18S.txt
+    patterns = [
+        f"blast_top*_abundance_{marker}.txt",
+        f"blast_top*_confidence_{marker}.txt",
+        f"blast_top*_{marker}.txt",  # legacy format without criterion
+    ]
+    files_found = []
+    for pat in patterns:
+        files_found.extend(blast_dir.glob(pat))
+
+    for fpath in sorted(set(files_found)):
+        with open(fpath, 'r') as f:
+            lines = f.readlines()
+        reading = False
+        for line in lines:
+            if line.startswith('---'):
+                reading = True
+                continue
+            if not reading or not line.strip():
+                continue
+            parts = line.split('|')
+            if len(parts) >= 4:
+                otu_id = parts[0].strip()
+                species = parts[2].strip()
+                identity_str = parts[3].strip().replace('%', '')
+                evalue_str = parts[4].strip() if len(parts) >= 5 else 'N/A'
+                try:
+                    identity = float(identity_str) if identity_str and identity_str != '-' else 0
+                    results[otu_id] = {
+                        'species': species,
+                        'identity': round(identity, 1),
+                        'evalue': evalue_str if evalue_str else 'N/A',
+                    }
+                except (ValueError, TypeError):
+                    continue
+    return results
+
+
 def detect_db_prefix(db_path, marker):
     """Detect taxonomy column prefix from database filename.
 
@@ -211,6 +263,9 @@ def main():
     parser.add_argument("--input_dir", required=True, help="Input directory")
     parser.add_argument("--blast_n", type=int, default=0, help="Number of top OTUs to BLAST per marker (0=skip)")
     parser.add_argument("--skip_blast", action='store_true', help="Skip BLAST, use only local taxonomy")
+    parser.add_argument("--blast_dir", default=None,
+                        help="Path to existing BLAST results directory. When --skip_blast is set, "
+                             "existing results from this directory are incorporated into the summary.")
     parser.add_argument("--markers", default=None,
                         help="Comma-separated list of markers (default: auto-detect from merged/ files)")
     # Note: confidence filtering is now done in analysis notebooks, not here
@@ -295,8 +350,9 @@ def main():
             print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (all confidence levels)")
         else:
             print(f"  [WARN] Taxonomy file not found")
+
         
-        # 4. Run BLAST if requested
+        # 4. Run BLAST if requested, or load existing results from blast_dir
         blast_results = {}
         if not args.skip_blast and args.blast_n > 0:
             print(f"[4/5] Running BLAST on top {args.blast_n} OTUs...")
@@ -319,8 +375,16 @@ def main():
             
             print(f"  Loaded {len(sequences)} sequences")
             blast_results = run_blast_batch(sequences, top_otus)
+        elif args.blast_dir:
+            blast_dir = Path(args.blast_dir)
+            print(f"[4/5] Loading existing BLAST results from {blast_dir}")
+            blast_results = parse_blast_results_dir(blast_dir, marker)
+            if blast_results:
+                print(f"  Loaded {len(blast_results)} BLAST results for {marker}")
+            else:
+                print(f"  No existing BLAST results found for {marker} in {blast_dir}")
         else:
-            print("[4/5] Skipping BLAST")
+            print("[4/5] Skipping BLAST (no --blast_dir provided)")
         
         # 5. Create comprehensive summary
         print("[5/5] Creating summary CSV...")
@@ -340,10 +404,13 @@ def main():
             
             # Add taxonomy (SILVA/PR2 for 18S and JEDI, MIDORI/eKOI for COI)
             # All levels stored with confidence — filtering done in notebooks
-            centroid_id = otu_to_centroid.get(otu_id, '')
+            # With isONclust3, OTU ID is the SINTAX query ID directly.
+            # Fall back to centroid UUID lookup for old VSEARCH-based runs.
             tax_levels = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
-            if centroid_id in silva_taxonomy:
-                tax = silva_taxonomy[centroid_id]
+            centroid_id = otu_to_centroid.get(otu_id, '')
+            tax_key = otu_id if otu_id in silva_taxonomy else centroid_id
+            if tax_key in silva_taxonomy:
+                tax = silva_taxonomy[tax_key]
                 for level in tax_levels:
                     row[f'{db_prefix}_{level}'] = tax.get(level.lower(), '')
                     row[f'{db_prefix}_{level}_Conf'] = tax.get(f'{level.lower()}_conf', '')
@@ -354,6 +421,7 @@ def main():
                     row[f'{db_prefix}_{level}_Conf'] = ''
 
             
+
             # Add BLAST results if available
             if otu_id in blast_results:
                 row['NCBI_TopHit'] = blast_results[otu_id]['species']

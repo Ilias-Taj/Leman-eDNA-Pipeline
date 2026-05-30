@@ -1,34 +1,40 @@
-# Project .gitignore - files and folders that should not be checked into git
+# ── Leman eDNA Pipeline .gitignore ──────────────────────────────────────────
 
-# Local conda env (recreate from environment.yml)
+# Local conda environment (recreate from environment.yml)
 /env/
 
-# Pipeline outputs and temporary results (ignore contents but keep folder structure)
+# Pipeline outputs (large, regenerable)
 /out/*
-!/out/.gitkeep
 
-# Raw input data (ignore contents but keep folder structure)
-data/*
-!data/.gitkeep
+# Raw sequencing data (too large for git)
+/data/*
 
-# Reference DB (ignore contents but keep folder structure)
-refs/*
-!refs/.gitkeep
+# Reference databases (large binary files - rebuild with setup scripts)
+/refs/*.udb
+/refs/*.fasta
+/refs/*.fasta.gz
+/refs/minimap2_refs/
+/refs/__pycache__/
 
-# Archived third-party or copied scripts
-/archive/
+# Pre-built tool binaries (download or build locally)
+/tools/isONclust3/
+/tools/minimap2-*/
 
-# macOS metadata
-.DS_Store
-
-# Python cache files
+# Python cache
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# OS metadata
+.DS_Store
+Thumbs.db
 
 # Editor/IDE
 .vscode/
-
-# Presentation (not part of project)
-Presentation_eDNA_Results.ipynb
-/presentation/
-*.pptx
+*.swp
+*.swo
+*~

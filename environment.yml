@@ -1,27 +1,34 @@
-# environment.yml
+# environment.yml — Leman eDNA Pipeline
+# Create with: conda env create -f environment.yml -p ./env
+# Or: bash create_env.sh
+
+name: edna-pipeline
 channels:
   - conda-forge
   - bioconda
   - defaults
+
 dependencies:
-  # --- Python & Base Tools ---
+  # --- Python & Base ---
   - python=3.10
-  - mamba       
   - pip
   - unzip
-  
+
   # --- Bioinformatics Tools ---
   - filtlong              # Quality filtering for long reads
-  - vsearch               # Global sequence alignment clustering & SINTAX taxonomy
-  - samtools              # SAM/BAM file processing
-  
-  # --- Python Data Science Packages ---
-  - biopython             # For BLAST interface (script 6)
-  - pandas                # Data manipulation (scripts 4, 5, 7)
-  - matplotlib            # Plotting (notebook analysis)
-  - seaborn               # Statistical visualizations (notebook)
-  - ipykernel             # Jupyter notebook kernel
-  
+  - vsearch              # Chimera detection, SINTAX taxonomy, UDB building
+  - samtools             # SAM/BAM processing (marker classification)
+  - cutadapt             # Primer trimming (step 2b)
+
+  # --- Python Scientific Stack ---
+  - biopython            # FASTA parsing, BLAST interface
+  - pandas               # Data manipulation (OTU tables, summaries)
+  - matplotlib           # Plotting (analysis notebooks)
+  - seaborn              # Statistical visualizations
+  - numpy               # Numerical operations
+  - ipykernel            # Jupyter notebook kernel
+  - jupyter              # Notebook execution
+
   # --- Pip Packages ---
-  - pip: 
-      - biopython
+  - pip:
+      - spoa             # SPOA consensus generation (clustering step)

@@ -9,7 +9,7 @@ Prerequisites:
     1. Run 3_run_clustering_by_marker.py first
     2. Download and prepare reference databases:
        - 18S: SILVA database (https://www.drive5.com/usearch/manual/sintax_downloads.html)
-       - COI: Database to be determined 
+       - COI: MIDORI2 (https://reference-midori.info/) or Porter (https://portal.unite.ut.ee/) 
     3. Convert to .udb format:
        wget https://www.drive5.com/sintax/silva_18s_v123.fa.gz
        gunzip silva_18s_v123.fa.gz
@@ -43,6 +43,7 @@ Output:
 
 import argparse
 import sys
+import os
 import subprocess
 from pathlib import Path
 
@@ -50,6 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from db_tag import label_from_path
 from utils import find_tool
+
 
 def run_sintax(consensus_fasta, output_file, db_path, vsearch_path, threads, confidence=0.8):
     """
@@ -322,7 +324,7 @@ Database Preparation:
             # Parse and summarize results
             stats = parse_sintax_output(taxonomy_file, marker)
             print_taxonomy_summary(stats, marker)
-    
+
     print(f"\n{'='*60}")
     print("TAXONOMY ASSIGNMENT COMPLETE")
     print(f"{'='*60}")

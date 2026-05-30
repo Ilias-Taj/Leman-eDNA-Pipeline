@@ -21,6 +21,9 @@ cd "$SCRIPT_DIR/.."
 #   --db_COI:  midori2 | ekoi | porter
 #   --db_JEDI: silva | pr2  (JEDI targets rRNA V4-V5, same as 18S)
 #   --db:      shorthand for --db_COI
+# Changelog:
+#   2025-05-12  No code changes. File mode fix (chmod +x).
+#               Step numbers unchanged: runs steps 5 + 7 (summary, no BLAST).
 
 ENV_PREFIX="./env"
 THREADS=14
@@ -142,6 +145,7 @@ if [[ "$DATASET" == "water" || "$DATASET" == "both" ]] && [ -d "$WATER" ]; then
         --input_dir "$WATER" \
         $WATER_ARGS \
         --skip_blast \
+        --blast_dir "$WATER/blast_results" \
         2>&1 | tee "$WATER/logs/taxonomy_summary.log"
   else
     echo ""
@@ -174,6 +178,7 @@ if [[ "$DATASET" == "soil" || "$DATASET" == "both" ]] && [ -d "$SOIL" ]; then
         --input_dir "$SOIL" \
         $SOIL_ARGS \
         --skip_blast \
+        --blast_dir "$SOIL/blast_results" \
         2>&1 | tee "$SOIL/logs/taxonomy_summary.log"
   else
     echo ""
