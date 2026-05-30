@@ -10,6 +10,7 @@ import re
 import gzip
 from pathlib import Path
 from matplotlib import cm
+from IPython.display import display
 from matplotlib.gridspec import GridSpec
 
 # ─── Global Configuration ────────────────────────────────────────────────────
