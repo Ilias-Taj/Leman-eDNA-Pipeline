@@ -31,7 +31,7 @@ Usage: $(basename "$0") [options]
 
 Options:
   --db_18S  DB     18S database: pr2 (default), silva, or path to .udb
-  --db_COI  DB     COI database: porter (default), midori2, ekoi, or path to .udb
+  --db_COI  DB     COI database: midori2 (default), midori2, ekoi, or path to .udb
   --db_JEDI DB     JEDI database: pr2 (default), silva, or path to .udb
   --threads N      Threads (default: $THREADS)
   --skip_blast     Skip BLAST validation step (default: false)
