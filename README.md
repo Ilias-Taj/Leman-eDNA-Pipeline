@@ -247,8 +247,7 @@ Each notebook includes: confidence dashboards, DB performance comparison, taxono
 
 ## Methodology Notes
 
-- **Nanopore-specific:** No PCR duplicate removal (dereplication) before clustering — Nanopore reads each originate from a unique molecule, so pre-clustering dereplication has no effect. Post-clustering dereplication of consensus sequences is a potential improvement when merging multiple runs.
-- **Classification:** Reads are separated by amplicon length. JEDI (250–500 bp) targets the same rRNA gene family as 18S but with different primers (515F-Y/926R), so it uses an 18S/SSU database (PR2 or SILVA), not a COI database.
+- **Nanopore-specific:** No PCR duplicate removal (dereplication) before clustering — Nanopore reads each originate from a unique molecule, so pre-clustering dereplication has no effect. - **Classification:** Reads are separated by amplicon length and primer recognition. JEDI (250–500 bp) targets the same rRNA gene family as 18S but with different primers (515F-Y/926R), so it uses an 18S/SSU database (PR2 or SILVA), not a COI database.
 - **Clustering:** isONclust3 (quality-aware ONT clustering) with SPOA consensus polishing. Chimeras removed with VSEARCH `uchime_denovo`.
 - **Confidence filtering:** Taxonomy assignments include per-rank confidence scores (0–1). Analysis notebooks filter at confidence ≥ 0.8 by default.
 
@@ -256,14 +255,12 @@ Each notebook includes: confidence dashboards, DB performance comparison, taxono
 
 ### Priority
 
-1. **Ciliate blocking primers:** COI results are dominated by ciliate sequences (Oligohymenophorea, Intramacronucleata). Implement blocking primers to suppress ciliate amplification and increase vertebrate/invertebrate detection.
-2. **Local reference library:** Compile a custom COI/18S reference for Swiss freshwater taxa (Lake Geneva) to improve assignment accuracy for local species.
+1. **Automated sample metadata integration:** Parse sample sheets or barcode-to-sample mappings to auto-label results with site names, dates, and conditions.
+2. **HTML report generation:** Auto-generate a summary report (species lists, diversity indices, quality stats) after pipeline completion.
 
 ### Potential Improvements
 
-3. **Primer-based marker classification:** For datasets where JEDI and COI size ranges overlap, implement primer sequence detection as an alternative to length-based classification.
-4. **Post-clustering dereplication:** Add `vsearch --derep_fulllength` on consensus sequences when merging results from multiple sequencing runs.
-5. **Additional markers:** Extend the pipeline to support other amplicon markers (e.g., ITS for fungi, 16S for bacteria).
+3. **Workflow manager (Snakemake/Nextflow):** Convert the bash pipeline into a declarative workflow for automatic parallelization, resumability on failure, and native HPC/cloud scaling.
 
 ## Repository Structure
 
