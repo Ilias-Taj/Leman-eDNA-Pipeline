@@ -1,0 +1,407 @@
+2026-05-30 14:17:27 | Root: data/Water_eDNA_18S_COI_14_01_26/fastq_pass
+2026-05-30 14:17:27 | Run name: Water_eDNA_18S_COI_14_01_26
+2026-05-30 14:17:27 | Output root: out/Water_eDNA_18S_COI_14_01_26
+2026-05-30 14:17:27 | Using conda env prefix: ./env
+2026-05-30 14:17:27 | Main log: out/logs/pipeline_20260530_141727.log
+2026-05-30 14:17:27 | 
+2026-05-30 14:17:27 | SYSTEM RESOURCES
+2026-05-30 14:17:27 | =======================================
+2026-05-30 14:17:27 | CPU Cores available: 14
+2026-05-30 14:17:27 | Total memory: 27 GB
+2026-05-30 14:17:27 | System: Linux
+2026-05-30 14:17:27 | 
+2026-05-30 14:17:27 | PIPELINE CONFIGURATION
+2026-05-30 14:17:27 | =======================================
+2026-05-30 14:17:27 | Threads/jobs per task: 14
+2026-05-30 14:17:27 | Active markers: 18S,COI
+2026-05-30 14:17:27 | Quality threshold (min_mean_q): 15
+2026-05-30 14:17:27 | Clustering method: isONclust3 + SPOA consensus
+2026-05-30 14:17:27 | Chimera removal: VSEARCH uchime_denovo
+2026-05-30 14:17:27 | 
+Found samples: barcode01 barcode02 barcode03 barcode04 barcode05 barcode06 barcode07 barcode08 barcode09 barcode10 barcode11 barcode12 barcode13 barcode14 barcode15 unclassified
+
+=======================================
+STARTING FULL PIPELINE PROCESSING
+=======================================
+2026-05-30 14:17:27 | 
+2026-05-30 14:17:27 | =======================================
+2026-05-30 14:17:27 | STARTING FULL PIPELINE PROCESSING
+2026-05-30 14:17:27 | =======================================
+2026-05-30 14:17:27 | Processing all 16 samples with full timing and resource tracking...
+
+
+========== Processing: barcode01 ==========
+2026-05-30 14:17:27 | 
+2026-05-30 14:17:27 | ========== Processing: barcode01 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode01
+2026-05-30 14:17:27 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode01
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode01/raw_reads.fastq.gz
+2026-05-30 14:17:27 | Concatenating 18 FASTQ files for barcode01
+Running preprocessing (quality filter only) ...
+2026-05-30 14:17:27 | Running preprocessing for barcode01 (65MB)...
+[TIMING] barcode01 - Preprocessing: 43s
+2026-05-30 14:18:10 | [OK] Preprocessing complete for barcode01 (43s)
+[STATS] barcode01 - Preprocessing: 43s (65MB -> 49MB)
+2026-05-30 14:18:10 | [STATS] barcode01 - Preprocessing: 43s (65MB -> 49MB)
+Finished preprocessing: barcode01
+
+========== Processing: barcode02 ==========
+2026-05-30 14:18:10 | 
+2026-05-30 14:18:10 | ========== Processing: barcode02 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode02
+2026-05-30 14:18:10 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode02
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode02/raw_reads.fastq.gz
+2026-05-30 14:18:10 | Concatenating 18 FASTQ files for barcode02
+Running preprocessing (quality filter only) ...
+2026-05-30 14:18:10 | Running preprocessing for barcode02 (14MB)...
+[TIMING] barcode02 - Preprocessing: 8s
+2026-05-30 14:18:18 | [OK] Preprocessing complete for barcode02 (8s)
+[STATS] barcode02 - Preprocessing: 8s (14MB -> 10MB)
+2026-05-30 14:18:18 | [STATS] barcode02 - Preprocessing: 8s (14MB -> 10MB)
+Finished preprocessing: barcode02
+
+========== Processing: barcode03 ==========
+2026-05-30 14:18:18 | 
+2026-05-30 14:18:18 | ========== Processing: barcode03 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode03
+2026-05-30 14:18:18 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode03
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode03/raw_reads.fastq.gz
+2026-05-30 14:18:18 | Concatenating 18 FASTQ files for barcode03
+Running preprocessing (quality filter only) ...
+2026-05-30 14:18:18 | Running preprocessing for barcode03 (23MB)...
+[TIMING] barcode03 - Preprocessing: 13s
+2026-05-30 14:18:31 | [OK] Preprocessing complete for barcode03 (13s)
+[STATS] barcode03 - Preprocessing: 13s (23MB -> 17MB)
+2026-05-30 14:18:31 | [STATS] barcode03 - Preprocessing: 13s (23MB -> 17MB)
+Finished preprocessing: barcode03
+
+========== Processing: barcode04 ==========
+2026-05-30 14:18:31 | 
+2026-05-30 14:18:31 | ========== Processing: barcode04 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode04
+2026-05-30 14:18:31 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode04
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode04/raw_reads.fastq.gz
+2026-05-30 14:18:31 | Concatenating 18 FASTQ files for barcode04
+Running preprocessing (quality filter only) ...
+2026-05-30 14:18:31 | Running preprocessing for barcode04 (57MB)...
+[TIMING] barcode04 - Preprocessing: 37s
+2026-05-30 14:19:08 | [OK] Preprocessing complete for barcode04 (37s)
+[STATS] barcode04 - Preprocessing: 37s (57MB -> 43MB)
+2026-05-30 14:19:08 | [STATS] barcode04 - Preprocessing: 37s (57MB -> 43MB)
+Finished preprocessing: barcode04
+
+========== Processing: barcode05 ==========
+2026-05-30 14:19:08 | 
+2026-05-30 14:19:08 | ========== Processing: barcode05 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode05
+2026-05-30 14:19:08 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode05
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode05/raw_reads.fastq.gz
+2026-05-30 14:19:08 | Concatenating 18 FASTQ files for barcode05
+Running preprocessing (quality filter only) ...
+2026-05-30 14:19:08 | Running preprocessing for barcode05 (5MB)...
+[TIMING] barcode05 - Preprocessing: 6s
+2026-05-30 14:19:14 | [OK] Preprocessing complete for barcode05 (6s)
+[STATS] barcode05 - Preprocessing: 6s (5MB -> 4MB)
+2026-05-30 14:19:14 | [STATS] barcode05 - Preprocessing: 6s (5MB -> 4MB)
+Finished preprocessing: barcode05
+
+========== Processing: barcode06 ==========
+2026-05-30 14:19:14 | 
+2026-05-30 14:19:14 | ========== Processing: barcode06 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode06
+2026-05-30 14:19:14 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode06
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode06/raw_reads.fastq.gz
+2026-05-30 14:19:14 | Concatenating 18 FASTQ files for barcode06
+Running preprocessing (quality filter only) ...
+2026-05-30 14:19:14 | Running preprocessing for barcode06 (6MB)...
+[TIMING] barcode06 - Preprocessing: 4s
+2026-05-30 14:19:18 | [OK] Preprocessing complete for barcode06 (4s)
+[STATS] barcode06 - Preprocessing: 4s (6MB -> 4MB)
+2026-05-30 14:19:18 | [STATS] barcode06 - Preprocessing: 4s (6MB -> 4MB)
+Finished preprocessing: barcode06
+
+========== Processing: barcode07 ==========
+2026-05-30 14:19:18 | 
+2026-05-30 14:19:18 | ========== Processing: barcode07 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode07
+2026-05-30 14:19:18 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode07
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode07/raw_reads.fastq.gz
+2026-05-30 14:19:18 | Concatenating 18 FASTQ files for barcode07
+Running preprocessing (quality filter only) ...
+2026-05-30 14:19:18 | Running preprocessing for barcode07 (75MB)...
+[TIMING] barcode07 - Preprocessing: 46s
+2026-05-30 14:20:04 | [OK] Preprocessing complete for barcode07 (46s)
+[STATS] barcode07 - Preprocessing: 46s (75MB -> 54MB)
+2026-05-30 14:20:04 | [STATS] barcode07 - Preprocessing: 46s (75MB -> 54MB)
+Finished preprocessing: barcode07
+
+========== Processing: barcode08 ==========
+2026-05-30 14:20:04 | 
+2026-05-30 14:20:04 | ========== Processing: barcode08 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode08
+2026-05-30 14:20:04 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode08
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode08/raw_reads.fastq.gz
+2026-05-30 14:20:04 | Concatenating 18 FASTQ files for barcode08
+Running preprocessing (quality filter only) ...
+2026-05-30 14:20:04 | Running preprocessing for barcode08 (20MB)...
+[TIMING] barcode08 - Preprocessing: 14s
+2026-05-30 14:20:18 | [OK] Preprocessing complete for barcode08 (14s)
+[STATS] barcode08 - Preprocessing: 14s (20MB -> 15MB)
+2026-05-30 14:20:18 | [STATS] barcode08 - Preprocessing: 14s (20MB -> 15MB)
+Finished preprocessing: barcode08
+
+========== Processing: barcode09 ==========
+2026-05-30 14:20:18 | 
+2026-05-30 14:20:18 | ========== Processing: barcode09 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode09
+2026-05-30 14:20:18 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode09
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode09/raw_reads.fastq.gz
+2026-05-30 14:20:18 | Concatenating 18 FASTQ files for barcode09
+Running preprocessing (quality filter only) ...
+2026-05-30 14:20:18 | Running preprocessing for barcode09 (46MB)...
+[TIMING] barcode09 - Preprocessing: 40s
+2026-05-30 14:20:58 | [OK] Preprocessing complete for barcode09 (40s)
+[STATS] barcode09 - Preprocessing: 40s (46MB -> 35MB)
+2026-05-30 14:20:58 | [STATS] barcode09 - Preprocessing: 40s (46MB -> 35MB)
+Finished preprocessing: barcode09
+
+========== Processing: barcode10 ==========
+2026-05-30 14:20:58 | 
+2026-05-30 14:20:58 | ========== Processing: barcode10 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode10
+2026-05-30 14:20:58 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode10
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode10/raw_reads.fastq.gz
+2026-05-30 14:20:58 | Concatenating 18 FASTQ files for barcode10
+Running preprocessing (quality filter only) ...
+2026-05-30 14:20:58 | Running preprocessing for barcode10 (44MB)...
+[TIMING] barcode10 - Preprocessing: 36s
+2026-05-30 14:21:34 | [OK] Preprocessing complete for barcode10 (36s)
+[STATS] barcode10 - Preprocessing: 36s (44MB -> 34MB)
+2026-05-30 14:21:34 | [STATS] barcode10 - Preprocessing: 36s (44MB -> 34MB)
+Finished preprocessing: barcode10
+
+========== Processing: barcode11 ==========
+2026-05-30 14:21:34 | 
+2026-05-30 14:21:34 | ========== Processing: barcode11 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode11
+2026-05-30 14:21:34 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode11
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode11/raw_reads.fastq.gz
+2026-05-30 14:21:34 | Concatenating 18 FASTQ files for barcode11
+Running preprocessing (quality filter only) ...
+2026-05-30 14:21:35 | Running preprocessing for barcode11 (45MB)...
+[TIMING] barcode11 - Preprocessing: 23s
+2026-05-30 14:21:58 | [OK] Preprocessing complete for barcode11 (23s)
+[STATS] barcode11 - Preprocessing: 23s (45MB -> 31MB)
+2026-05-30 14:21:58 | [STATS] barcode11 - Preprocessing: 23s (45MB -> 31MB)
+Finished preprocessing: barcode11
+
+========== Processing: barcode12 ==========
+2026-05-30 14:21:58 | 
+2026-05-30 14:21:58 | ========== Processing: barcode12 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode12
+2026-05-30 14:21:58 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode12
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode12/raw_reads.fastq.gz
+2026-05-30 14:21:58 | Concatenating 18 FASTQ files for barcode12
+Running preprocessing (quality filter only) ...
+2026-05-30 14:21:58 | Running preprocessing for barcode12 (43MB)...
+[TIMING] barcode12 - Preprocessing: 26s
+2026-05-30 14:22:24 | [OK] Preprocessing complete for barcode12 (26s)
+[STATS] barcode12 - Preprocessing: 26s (43MB -> 30MB)
+2026-05-30 14:22:24 | [STATS] barcode12 - Preprocessing: 26s (43MB -> 30MB)
+Finished preprocessing: barcode12
+
+========== Processing: barcode13 ==========
+2026-05-30 14:22:24 | 
+2026-05-30 14:22:24 | ========== Processing: barcode13 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode13
+2026-05-30 14:22:24 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode13
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode13/raw_reads.fastq.gz
+2026-05-30 14:22:24 | Concatenating 18 FASTQ files for barcode13
+Running preprocessing (quality filter only) ...
+2026-05-30 14:22:24 | Running preprocessing for barcode13 (3MB)...
+[TIMING] barcode13 - Preprocessing: 2s
+2026-05-30 14:22:26 | [OK] Preprocessing complete for barcode13 (2s)
+[STATS] barcode13 - Preprocessing: 2s (3MB -> 2MB)
+2026-05-30 14:22:26 | [STATS] barcode13 - Preprocessing: 2s (3MB -> 2MB)
+Finished preprocessing: barcode13
+
+========== Processing: barcode14 ==========
+2026-05-30 14:22:26 | 
+2026-05-30 14:22:26 | ========== Processing: barcode14 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode14
+2026-05-30 14:22:26 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode14
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode14/raw_reads.fastq.gz
+2026-05-30 14:22:26 | Concatenating 18 FASTQ files for barcode14
+Running preprocessing (quality filter only) ...
+2026-05-30 14:22:26 | Running preprocessing for barcode14 (21MB)...
+[TIMING] barcode14 - Preprocessing: 15s
+2026-05-30 14:22:41 | [OK] Preprocessing complete for barcode14 (15s)
+[STATS] barcode14 - Preprocessing: 15s (21MB -> 15MB)
+2026-05-30 14:22:41 | [STATS] barcode14 - Preprocessing: 15s (21MB -> 15MB)
+Finished preprocessing: barcode14
+
+========== Processing: barcode15 ==========
+2026-05-30 14:22:41 | 
+2026-05-30 14:22:41 | ========== Processing: barcode15 ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode15
+2026-05-30 14:22:41 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/barcode15
+Concatenating 17 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/barcode15/raw_reads.fastq.gz
+2026-05-30 14:22:41 | Concatenating 17 FASTQ files for barcode15
+Running preprocessing (quality filter only) ...
+2026-05-30 14:22:41 | Running preprocessing for barcode15 (1MB)...
+[TIMING] barcode15 - Preprocessing: 1s
+2026-05-30 14:22:42 | [OK] Preprocessing complete for barcode15 (1s)
+[STATS] barcode15 - Preprocessing: 1s (1MB -> 1MB)
+2026-05-30 14:22:42 | [STATS] barcode15 - Preprocessing: 1s (1MB -> 1MB)
+Finished preprocessing: barcode15
+
+========== Processing: unclassified ==========
+2026-05-30 14:22:42 | 
+2026-05-30 14:22:42 | ========== Processing: unclassified ==========
+Creating output directory: out/Water_eDNA_18S_COI_14_01_26/unclassified
+2026-05-30 14:22:42 | Creating output directory: out/Water_eDNA_18S_COI_14_01_26/unclassified
+Concatenating 18 FASTQ chunks into out/Water_eDNA_18S_COI_14_01_26/unclassified/raw_reads.fastq.gz
+2026-05-30 14:22:42 | Concatenating 18 FASTQ files for unclassified
+Running preprocessing (quality filter only) ...
+2026-05-30 14:22:42 | Running preprocessing for unclassified (4MB)...
+[TIMING] unclassified - Preprocessing: 2s
+2026-05-30 14:22:44 | [OK] Preprocessing complete for unclassified (2s)
+[STATS] unclassified - Preprocessing: 2s (4MB -> 3MB)
+2026-05-30 14:22:44 | [STATS] unclassified - Preprocessing: 2s (4MB -> 3MB)
+Finished preprocessing: unclassified
+
+=======================================
+GLOBAL MARKER CLASSIFICATION & CLUSTERING
+=======================================
+
+[2/7] Classifying reads by marker...
+2026-05-30 14:22:44 | 
+2026-05-30 14:22:44 | =======================================
+2026-05-30 14:22:44 | GLOBAL MARKER CLASSIFICATION & CLUSTERING
+2026-05-30 14:22:44 | =======================================
+2026-05-30 14:22:44 | [2/7] Classifying reads by marker...
+[OK] Marker classification complete (210s, 10MB memory)
+2026-05-30 14:26:14 | [OK] Marker classification complete (210s, 10MB memory)
+
+[2b/7] Primer reclassification + trimming (cutadapt)...
+2026-05-30 14:26:14 | [2b/7] Trimming primer sequences...
+[OK] Primer trimming complete (227s)
+2026-05-30 14:30:01 | [OK] Primer trimming complete (227s)
+
+[3/7] Running global OTU clustering...
+2026-05-30 14:30:01 | [3/7] Running global OTU clustering...
+[OK] Global clustering complete (99s, -11MB memory)
+2026-05-30 14:31:40 | [OK] Global clustering complete (99s, -11MB memory)
+
+[4/7] Generating abundance matrices...
+2026-05-30 14:31:40 | [4/7] Generating abundance matrices...
+[OK] Abundance matrices complete (1s, -6MB memory)
+2026-05-30 14:31:41 | [OK] Abundance matrices complete (1s, -6MB memory)
+
+[5/7] Assigning taxonomy with VSEARCH SINTAX...
+2026-05-30 14:31:41 | [5/7] Assigning taxonomy with VSEARCH SINTAX...
+[OK] Taxonomy assignment complete (124s, 4MB memory)
+2026-05-30 14:33:45 | [OK] Taxonomy assignment complete (124s, 4MB memory)
+
+[6/7] Generating comprehensive taxonomy summary...
+2026-05-30 14:33:45 | [6/7] Generating comprehensive taxonomy summary...
+[OK] Comprehensive summary complete (3s, 1MB memory)
+2026-05-30 14:33:48 | [OK] Comprehensive summary complete (3s, 1MB memory)
+
+[7/7] Running BLAST validation (top 10 abundance + top 10 confidence)...
+2026-05-30 14:33:48 | [7/7] Running BLAST validation (top 10 abundance + top 10 confidence)...
+  BLASTing top 10 18S OTUs by abundance...
+2026-05-30 14:33:48 |   BLASTing top 10 18S OTUs by abundance...
+  [OK] 18S abundance BLAST complete
+  BLASTing top 10 18S OTUs by confidence...
+2026-05-30 14:42:59 |   BLASTing top 10 18S OTUs by confidence...
+  [OK] 18S confidence BLAST complete
+  BLASTing top 10 COI OTUs by abundance...
+2026-05-30 14:51:07 |   BLASTing top 10 COI OTUs by abundance...
+  [OK] COI abundance BLAST complete
+  BLASTing top 10 COI OTUs by confidence...
+2026-05-30 14:56:16 |   BLASTing top 10 COI OTUs by confidence...
+  [OK] COI confidence BLAST complete
+[OK] BLAST validation complete (1596s, 4MB memory)
+2026-05-30 15:00:24 | [OK] BLAST validation complete (1596s, 4MB memory)
+
+
+=======================================
+FINAL PROCESSING SUMMARY
+=======================================
+2026-05-30 15:00:24 | 
+2026-05-30 15:00:24 | =======================================
+2026-05-30 15:00:24 | FINAL PROCESSING SUMMARY
+2026-05-30 15:00:24 | =======================================
+Total pipeline runtime: 0h 42m 57s (2577s)
+2026-05-30 15:00:24 | Total pipeline runtime: 0h 42m 57s (2577s)
+
+COMPUTATIONAL RESOURCES USED
+=======================================
+CPU Cores allocated: 14 per task (of 14 available)
+Total memory available: 27 GB
+System: Linux
+
+PER-BARCODE PREPROCESSING TIMES
+=======================================
+Barcode         Preproc(s)     
+---------------------------------------
+barcode01       43             
+barcode02       8              
+barcode03       13             
+barcode04       37             
+barcode05       6              
+barcode06       4              
+barcode07       46             
+barcode08       14             
+barcode09       40             
+barcode10       36             
+barcode11       23             
+barcode12       26             
+barcode13       2              
+barcode14       15             
+barcode15       1              
+unclassified    2              
+---------------------------------------
+AVERAGE         19             
+TOTAL           316            
+
+GLOBAL PIPELINE STEPS TIMING
+=======================================
+Marker classification                 210s (  8%)      +10MB
+Global clustering                      99s (  3%)      -11MB
+Abundance matrices                      1s (  0%)       -6MB
+Taxonomy assignment                   124s (  4%)       +4MB
+Comprehensive summary                   3s (  0%)       +1MB
+BLAST validation                     1596s ( 61%)       +4MB
+---------------------------------------
+Total global steps                   2033s ( 78%)
+
+TIME ALLOCATION ANALYSIS
+=======================================
+Per-barcode preprocessing: 316s (~12%)
+Global pipeline steps:     2033s (~78%)
+File I/O & overhead:       228s (~8%)
+
+PERFORMANCE NOTES
+=======================================
+[OK] Well-balanced resource usage across all pipeline steps
+
+OUTPUT FILES
+=======================================
+Abundance matrices:    out/Water_eDNA_18S_COI_14_01_26/merged/
+Taxonomy assignments:  out/Water_eDNA_18S_COI_14_01_26/taxonomy/
+BLAST validation:      out/Water_eDNA_18S_COI_14_01_26/blast_results/ (abundance + confidence)
+Summary CSV:           out/Water_eDNA_18S_COI_14_01_26/taxonomy_summary/
+Logs:                  out/Water_eDNA_18S_COI_14_01_26/logs/
+
+============================================================
+PIPELINE COMPLETE!
+============================================================
+All done. Results are in: out/Water_eDNA_18S_COI_14_01_26
+2026-05-30 15:00:24 | 
+2026-05-30 15:00:24 | ============================================================
+2026-05-30 15:00:24 | PIPELINE COMPLETE!
+2026-05-30 15:00:24 | ============================================================
+2026-05-30 15:00:24 | All done. Results are in: out/Water_eDNA_18S_COI_14_01_26
+2026-05-30 15:00:24 | Main log file: out/logs/pipeline_20260530_141727.log
