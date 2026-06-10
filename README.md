@@ -31,7 +31,7 @@ This pipeline processes multi-marker amplicon sequencing data (18S rRNA, COI, an
 
 ## Pipeline Overview
 
-![eDNA Metabarcoding Pipeline Workflow](figures/pipeline_for_edna.png)
+![eDNA Metabarcoding Pipeline Workflow](figures/pipeline_for_edna_2.png)
 
 ### Pipeline Steps
 
