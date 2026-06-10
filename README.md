@@ -247,7 +247,8 @@ Each notebook includes: confidence dashboards, DB performance comparison, taxono
 
 ## Methodology Notes
 
-- **Nanopore-specific:** No PCR duplicate removal (dereplication) before clustering — Nanopore reads each originate from a unique molecule, so pre-clustering dereplication has no effect. - **Classification:** Reads are separated by amplicon length and primer recognition. JEDI (250–500 bp) targets the same rRNA gene family as 18S but with different primers (515F-Y/926R), so it uses an 18S/SSU database (PR2 or SILVA), not a COI database.
+- **Nanopore-specific:** No PCR duplicate removal (dereplication) before clustering — Nanopore reads each originate from a unique molecule, so pre-clustering dereplication has no effect.
+- **Classification:** Reads are separated by amplicon length and primer recognition. JEDI (250–500 bp) targets the same rRNA gene family as 18S but with different primers (515F-Y/926R), so it uses an 18S/SSU database (PR2 or SILVA), not a COI database.
 - **Clustering:** isONclust3 (quality-aware ONT clustering) with SPOA consensus polishing. Chimeras removed with VSEARCH `uchime_denovo`.
 - **Confidence filtering:** Taxonomy assignments include per-rank confidence scores (0–1). Analysis notebooks filter at confidence ≥ 0.8 by default.
 
