@@ -1,0 +1,5 @@
+- correct/clean code
+- nomenclature on output
+- web app for biodiversity map
+- server to host and run 
+- 

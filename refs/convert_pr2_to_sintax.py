@@ -6,17 +6,19 @@ PR2 DADA2 format (header) - NO accession, just taxonomy:
   >Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
 
 VSEARCH SINTAX format:
-  >Accession;tax=d:Kingdom,k:Supergroup,p:Division,c:Subdivision,o:Class,f:Family,g:Genus,s:Species;
-
+  >Accession;tax=d:Domain,k:Supergroup,p:Division,c:Class,o:Order,f:Family,g:Genus,s:Species;
+  
 Mapping (PR2 9-level -> SINTAX 8-level):
   d: = Kingdom (Eukaryota)
   k: = Supergroup (Obazoa, TSAR, Archaeplastida...)
   p: = Division (Opisthokonta, Alveolata, Stramenopiles...)
-  c: = Subdivision (Metazoa, Ciliophora, Dinoflagellata...)
-  o: = Class
+  c: = Class
+  o: = Order
   f: = Family (or Order if Family is placeholder)
   g: = Genus
   s: = Species
+  
+PR2's Subdivision rank is intentionally omitted because SINTAX provides only eight rank codes.
 
 Usage:
   python3 refs/convert_pr2_to_sintax.py \
@@ -29,7 +31,6 @@ Then build the .udb:
 """
 
 import argparse
-import sys
 import re
 
 
@@ -79,39 +80,34 @@ def convert_header(header_line, seq_idx):
     while len(fields) < 9:
         fields.append('')
 
-    kingdom     = clean_field(fields[0])
+    kingdom      = clean_field(fields[0])
     supergroup  = clean_field(fields[1])
     division    = clean_field(fields[2])
-    subdivision = clean_field(fields[3])
-    pr2_class   = clean_field(fields[4])
-    pr2_order   = clean_field(fields[5])
-    pr2_family  = clean_field(fields[6])
-    genus       = clean_field(fields[7]) if len(fields) > 7 else ''
-    species     = clean_field(fields[8]) if len(fields) > 8 else ''
-
-    # Build SINTAX taxonomy string (8 levels max)
-    # o: = Class (PR2 class is typically order-level equivalent)
-    # f: = Family (or Order if family is empty)
-    order_name = pr2_class if pr2_class else pr2_order
-    family_name = pr2_family if pr2_family else pr2_order
-
-    tax_parts = []
-    if kingdom:
-        tax_parts.append(f"d:{kingdom}")
-    if supergroup:
-        tax_parts.append(f"k:{supergroup}")
-    if division:
-        tax_parts.append(f"p:{division}")
-    if subdivision:
-        tax_parts.append(f"c:{subdivision}")
-    if order_name:
-        tax_parts.append(f"o:{order_name}")
-    if family_name:
-        tax_parts.append(f"f:{family_name}")
-    if genus:
-        tax_parts.append(f"g:{genus}")
-    if species:
-        tax_parts.append(f"s:{species}")
+    
+    # fields[3] is PR2 Subdivision. SINTAX has no corresponding
+    # rank code, so it is deliberately omitted.
+    class_name  = clean_field(fields[4])
+    order_name  = clean_field(fields[5])
+    family_name = clean_field(fields[6])
+    genus       = clean_field(fields[7])
+    species     = clean_field(fields[8])
+    
+    rank_values = (
+        ("d", kingdom),
+        ("k", supergroup),
+        ("p", division),
+        ("c", class_name),
+        ("o", order_name),
+        ("f", family_name),
+        ("g", genus),
+        ("s", species),
+    )
+    
+    tax_parts = [
+        f"{rank}:{value}"
+        for rank, value in rank_values
+        if value
+    ]
 
     if not tax_parts:
         return None
