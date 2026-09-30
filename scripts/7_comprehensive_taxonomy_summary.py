@@ -41,7 +41,7 @@ import re
 
 # Ensure scripts/ is on the import path so utils.py can be found from any working directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from db_tag import label_from_path
+from db_tag import DB_RANK_MAPS, label_from_path
 
 def load_otu_to_centroid_mapping(otu_assignment_file):
     """Load mapping from OTU IDs to centroid IDs."""
@@ -59,79 +59,123 @@ def load_otu_to_centroid_mapping(otu_assignment_file):
     
     return otu_to_centroid
 
-def clean_taxon_name(taxon):
+def parse_taxon_name(raw_taxon, rank_name, db_label):
     """
-    Clean MIDORI2/SILVA taxon names:
-    1. Strip rank prefixes (e.g., "order_Vannellidae_95227" -> "Vannellidae_95227")
-    2. Strip trailing NCBI taxon IDs (e.g., "Arthropoda_6656" -> "Arthropoda")
-    3. Strip trailing underscores (e.g., "Metazoa_" -> "Metazoa")
-    """
-    if not taxon:
-        return taxon
-    # Strip rank prefixes
-    taxon = re.sub(r'^(kingdom|phylum|class|order|family|genus|species)_', '', taxon, flags=re.IGNORECASE)
-    # Strip trailing NCBI taxon IDs (digits after last underscore)
-    parts = taxon.rsplit('_', 1)
-    if len(parts) == 2 and parts[1].isdigit():
-        taxon = parts[0]
-    # Strip trailing underscores
-    taxon = taxon.rstrip('_')
-    return taxon
+    Process one taxon name.
 
-def parse_silva_taxonomy(taxonomy_file):
-    """Parse SILVA/MIDORI2/eKOI taxonomy from SINTAX output.
-    
-    Stores ALL taxonomy levels with their confidence values (no filtering).
-    Confidence-based filtering is done downstream in analysis notebooks,
-    allowing flexible threshold selection per plot."""
+    Returns:
+        taxon_name
+        NCBI TaxID, when provided by MIDORI2
+        whether the rank was artificially filled by MIDORI2
+    """
+    taxon_name = raw_taxon.strip().rstrip("_")
+    taxid = ""
+    is_imputed = False
+
+    if db_label == "midori2":
+        # MIDORI2 names can end with an NCBI TaxID:
+        # Arthropoda_6656 -> name=Arthropoda, taxid=6656
+        taxid_match = re.match(r"^(.*)_([0-9]+)$", taxon_name)
+
+        if taxid_match:
+            taxon_name = taxid_match.group(1).rstrip("_")
+            taxid = taxid_match.group(2)
+
+        # MIDORI2 fills missing ranks with names such as:
+        # class_Crocodylia
+        # order_Vannellidae
+        placeholder_prefix = f"{rank_name}_"
+
+        if taxon_name.lower().startswith(placeholder_prefix):
+            is_imputed = True
+            taxon_name = ""
+            taxid = ""
+
+    return taxon_name, taxid, is_imputed
+
+def parse_sintax_taxonomy(taxonomy_file, db_label):
+    """
+    Parse VSEARCH SINTAX output using the rank structure of the
+    selected reference database.
+    """
+    db_label = db_label.lower()
+
+    if db_label not in DB_RANK_MAPS:
+        raise ValueError(
+            f"No taxonomy rank mapping defined for database: {db_label}"
+        )
+
+    level_map = DB_RANK_MAPS[db_label]
     taxonomy_dict = {}
-    
-    level_map = {'d': 'domain', 'k': 'kingdom', 'p': 'phylum', 
-                 'c': 'class', 'o': 'order', 'f': 'family', 
-                 'g': 'genus', 's': 'species'}
-    
-    with open(taxonomy_file, 'r') as f:
-        for line in f:
+
+    with open(taxonomy_file, "r") as handle:
+        for line in handle:
             if not line.strip():
                 continue
-            
-            parts = line.split('\t')
+
+            parts = line.rstrip("\n").split("\t")
+
             if len(parts) < 2:
                 continue
-            
-            # Extract OTU ID from VSEARCH/SINTAX header.
-            # With isONclust3 pipeline headers look like: centroid=OTU_18S_000001;seqs=N
-            # With old VSEARCH pipeline headers look like: centroid=UUID|barcode|marker;size=N
-            raw_header = parts[0].split(';')[0]  # strip ;seqs=N or ;size=N
-            raw_header = raw_header.replace('centroid=', '').split('|')[0].strip()
-            centroid_id = raw_header  # OTU_18S_000001 or UUID
-            full_taxonomy = parts[1] if len(parts) > 1 else ""
-            
-            tax_dict = {'domain': '', 'phylum': '', 'class': '', 'order': '', 
-                       'family': '', 'genus': '', 'species': '',
-                       'domain_conf': '', 'phylum_conf': '', 'class_conf': '',
-                       'order_conf': '', 'family_conf': '', 'genus_conf': '',
-                       'species_conf': ''}
-            
-            # Parse all levels with confidence scores from col1
-            for match in re.finditer(r'([dkpcofgs]):([^,(]+)\(([0-9.]+)\)', full_taxonomy):
+
+            # Remove centroid= and abundance annotations from the query ID.
+            raw_header = parts[0].split(";")[0]
+            raw_header = raw_header.replace("centroid=", "")
+            centroid_id = raw_header.split("|")[0].strip()
+
+            full_taxonomy = parts[1].strip()
+
+            tax_dict = {}
+
+            # Initialise only the ranks belonging to this database.
+            for rank_name in dict.fromkeys(level_map.values()):
+                tax_dict[rank_name] = ""
+                tax_dict[f"{rank_name}_conf"] = ""
+                tax_dict[f"{rank_name}_taxid"] = ""
+                tax_dict[f"{rank_name}_imputed"] = False
+
+            # First split the SINTAX taxonomy into individual ranks.
+            for item in full_taxonomy.split(","):
+                item = item.strip()
+
+                # Examples:
+                # p:Arthropoda(0.95)
+                # k:Metazoa_(Animalia)(0.98)
+                match = re.match(
+                    r"^([dkpcofgs]):(.+)\(([0-9]*\.?[0-9]+)\)$",
+                    item,
+                )
+
+                if not match:
+                    continue
+
                 level_code = match.group(1)
-                taxon = match.group(2).strip()
+                raw_taxon = match.group(2).strip()
                 confidence = float(match.group(3))
-                taxon = clean_taxon_name(taxon)
-                
-                if level_code in level_map:
-                    level_name = level_map[level_code]
-                    tax_dict[level_name] = taxon
-                    tax_dict[f'{level_name}_conf'] = round(confidence, 2)
-            
-            # MIDORI2 uses k: (kingdom) instead of d: (domain)
-            if not tax_dict.get('domain') and tax_dict.get('kingdom'):
-                tax_dict['domain'] = tax_dict['kingdom']
-                tax_dict['domain_conf'] = tax_dict.get('kingdom_conf', '')
-            
+
+                rank_name = level_map.get(level_code)
+
+                if rank_name is None:
+                    continue
+
+                taxon_name, taxid, is_imputed = parse_taxon_name(
+                    raw_taxon,
+                    rank_name,
+                    db_label,
+                )
+
+                tax_dict[f"{rank_name}_imputed"] = is_imputed
+
+                # Do not report artificial MIDORI2 ranks as assignments.
+                if is_imputed:
+                    continue
+
+                tax_dict[rank_name] = taxon_name
+                tax_dict[f"{rank_name}_conf"] = round(confidence, 2)
+                tax_dict[f"{rank_name}_taxid"] = taxid
+
             taxonomy_dict[centroid_id] = tax_dict
-    
+
     return taxonomy_dict
 
 def run_blast_batch(sequences, otu_ids):
@@ -344,12 +388,19 @@ def main():
         db_arg = getattr(args, f'db_{marker}', None)
         db_prefix = detect_db_prefix(db_arg, marker)
         print(f"[3/5] Loading local taxonomy assignments ({db_prefix})...")
-        silva_taxonomy = {}
+        taxonomy_assignments = {}
+
         if taxonomy_file.exists():
-            silva_taxonomy = parse_silva_taxonomy(taxonomy_file)
-            print(f"  Loaded {len(silva_taxonomy)} taxonomy assignments (all confidence levels)")
+            taxonomy_assignments = parse_sintax_taxonomy(
+                taxonomy_file,
+                db_label,
+            )
+            print(
+                f"  Loaded {len(taxonomy_assignments)} "
+                "taxonomy assignments (all confidence levels)"
+            )
         else:
-            print(f"  [WARN] Taxonomy file not found")
+            print("  [WARN] Taxonomy file not found")
 
         
         # 4. Run BLAST if requested, or load existing results from blast_dir
@@ -406,19 +457,48 @@ def main():
             # All levels stored with confidence — filtering done in notebooks
             # With isONclust3, OTU ID is the SINTAX query ID directly.
             # Fall back to centroid UUID lookup for old VSEARCH-based runs.
-            tax_levels = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
+            rank_map = DB_RANK_MAPS[db_label]
+            tax_levels = [
+                rank_name.title()
+                for rank_name in dict.fromkeys(
+                    DB_RANK_MAPS[db_label].values()
+                )
+            ]
+            
             centroid_id = otu_to_centroid.get(otu_id, '')
-            tax_key = otu_id if otu_id in silva_taxonomy else centroid_id
-            if tax_key in silva_taxonomy:
-                tax = silva_taxonomy[tax_key]
+            tax_key = otu_id if otu_id in taxonomy_assignments else centroid_id
+            if tax_key in taxonomy_assignments:
+                tax = taxonomy_assignments[tax_key]
                 for level in tax_levels:
-                    row[f'{db_prefix}_{level}'] = tax.get(level.lower(), '')
-                    row[f'{db_prefix}_{level}_Conf'] = tax.get(f'{level.lower()}_conf', '')
+                    level_key = level.lower()
+
+                    row[f"{db_prefix}_{level}"] = tax.get(
+                        level_key,
+                        "",
+                    )
+                    row[f"{db_prefix}_{level}_Conf"] = tax.get(
+                        f"{level_key}_conf",
+                        "",
+                    )
+
+                    if db_label == "midori2":
+                        row[f"{db_prefix}_{level}_TaxID"] = tax.get(
+                            f"{level_key}_taxid",
+                            "",
+                        )
+                        row[f"{db_prefix}_{level}_Imputed"] = tax.get(
+                            f"{level_key}_imputed",
+                            False,
+                        )
 
             else:
                 for level in tax_levels:
-                    row[f'{db_prefix}_{level}'] = ''
-                    row[f'{db_prefix}_{level}_Conf'] = ''
+                    row[f"{db_prefix}_{level}"] = ""
+                    row[f"{db_prefix}_{level}_Conf"] = ""
+
+                    if db_label == "midori2":
+                        row[f"{db_prefix}_{level}_TaxID"] = ""
+                        row[f"{db_prefix}_{level}_Imputed"] = False
 
             
 
@@ -447,7 +527,20 @@ def main():
         # Print summary statistics
         print(f"\nSummary Statistics for {marker}:")
         print(f"  Total OTUs: {len(summary_df)}")
-        assigned = summary_df[summary_df[f'{db_prefix}_Phylum'] != ''].shape[0]
+        
+        broad_rank = {
+            "pr2": "Division",
+            "silva": "Phylum",
+            "midori2": "Phylum",
+            "porter": "Phylum",
+        }[db_label]
+
+        assigned_column = f"{db_prefix}_{broad_rank}"
+
+        assigned = summary_df[
+            summary_df[assigned_column].fillna("") != ""
+        ].shape[0]
+        
         print(f"  With {db_prefix} taxonomy: {assigned} ({100*assigned/len(summary_df):.1f}%)")
         if blast_results:
             blasted = summary_df[summary_df['NCBI_TopHit'] != ''].shape[0]

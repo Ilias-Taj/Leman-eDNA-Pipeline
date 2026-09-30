@@ -17,9 +17,9 @@ set -eo pipefail
 #               --threads, --water_root, --soil_root) instead of env vars.
 #               Add usage() help function.
 # ── Defaults ──────────────────────────────────────────────────
-DB_18S="pr2"
+DB_18S="silva"
 DB_COI="midori2"
-DB_JEDI="pr2"
+DB_JEDI="silva"
 THREADS=14
 SKIP_BLAST=false
 WATER_ROOT="data/Water_eDNA_18S_COI_14_01_26/fastq_pass"
@@ -30,9 +30,9 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Options:
-  --db_18S  DB     18S database: pr2 (default), silva, or path to .udb
+  --db_18S  DB     18S database: silva (default), pr2, or path to .udb
   --db_COI  DB     COI database: midori2 (default), midori2, ekoi, or path to .udb
-  --db_JEDI DB     JEDI database: pr2 (default), silva, or path to .udb
+  --db_JEDI DB     JEDI database: silva (default), pr2, or path to .udb
   --threads N      Threads (default: $THREADS)
   --skip_blast     Skip BLAST validation step (default: false)
   --water_root DIR Water fastq_pass directory (default: $WATER_ROOT)

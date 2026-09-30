@@ -1,5 +1,6 @@
-- correct/clean code
-- nomenclature on output
-- web app for biodiversity map
-- server to host and run 
-- 
+- Correct/clean code (taxonomy ranks misused, logic, comments)
+- Add 16S
+- Nomenclature on output to create history
+- Control Dataset to check pipeline results integrity
+- Web app for biodiversity map
+- Server to host and run 

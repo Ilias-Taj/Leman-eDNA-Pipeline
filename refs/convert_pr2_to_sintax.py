@@ -3,18 +3,18 @@
 Convert PR2 SSU DADA2 fasta to VSEARCH SINTAX format for 18S classification.
 
 PR2 DADA2 format (header) - NO accession, just taxonomy:
-  >Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
+  >Domain;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
 
 VSEARCH SINTAX format:
   >Accession;tax=d:Domain,k:Supergroup,p:Division,c:Class,o:Order,f:Family,g:Genus,s:Species;
   
 Mapping (PR2 9-level -> SINTAX 8-level):
-  d: = Kingdom (Eukaryota)
+  d: = Domain (Eukaryota)
   k: = Supergroup (Obazoa, TSAR, Archaeplastida...)
   p: = Division (Opisthokonta, Alveolata, Stramenopiles...)
   c: = Class
   o: = Order
-  f: = Family (or Order if Family is placeholder)
+  f: = Family
   g: = Genus
   s: = Species
   
@@ -34,27 +34,43 @@ import argparse
 import re
 
 
-def clean_field(field):
-    """Remove trailing _X, _XX, _XXX placeholders and clean field."""
+def clean_field(field, rank):
+    """
+    Prepare a PR2 taxonomy field for SINTAX.
+
+    Unresolved ranks are omitted instead of being converted into
+    apparently valid taxonomic assignments.
+    """
     if field is None:
         return ""
+
     field = field.strip()
-    # Remove placeholder suffixes like _X, _XX, _XXX
-    field = re.sub(r'_X+$', '', field)
-    # Remove _sp. suffix
-    field = re.sub(r'_sp\.$', '', field)
+
     if not field:
         return ""
-    # Replace spaces with underscores for SINTAX compatibility
-    field = field.replace(' ', '_')
-    return field
+
+    # Examples: Tardigrada_X, Tardigrada_XX.
+    # These indicate an unresolved value at this rank.
+    if re.search(r"_X+$", field, flags=re.IGNORECASE):
+        return ""
+
+    # Example: Milnesium_sp.
+    # This is an unidentified species, not a species-level assignment.
+    if rank == "species" and re.search(
+        r"(?:_|\s)sp\.?$",
+        field,
+        flags=re.IGNORECASE,
+    ):
+        return ""
+
+    return field.replace(" ", "_")
 
 
 def convert_header(header_line, seq_idx):
     """Convert a PR2 DADA2 header to SINTAX format.
 
     PR2 DADA2 format has NO accession - header is just semicolon-separated taxonomy:
-      >Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
+      >Domain;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species;
     We generate a synthetic accession from the sequence index.
     """
     line = header_line.lstrip('>').strip().rstrip(';')
@@ -72,7 +88,7 @@ def convert_header(header_line, seq_idx):
     # Split taxonomy by semicolons
     fields = [f.strip() for f in taxonomy.split(';')]
 
-    # PR2 has 9 levels: Kingdom;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species
+    # PR2 has 9 levels: Domain;Supergroup;Division;Subdivision;Class;Order;Family;Genus;Species
     if len(fields) < 7:
         return None
 
@@ -80,20 +96,19 @@ def convert_header(header_line, seq_idx):
     while len(fields) < 9:
         fields.append('')
 
-    kingdom      = clean_field(fields[0])
-    supergroup  = clean_field(fields[1])
-    division    = clean_field(fields[2])
-    
-    # fields[3] is PR2 Subdivision. SINTAX has no corresponding
-    # rank code, so it is deliberately omitted.
-    class_name  = clean_field(fields[4])
-    order_name  = clean_field(fields[5])
-    family_name = clean_field(fields[6])
-    genus       = clean_field(fields[7])
-    species     = clean_field(fields[8])
+    domain = clean_field(fields[0], "domain")
+    supergroup = clean_field(fields[1], "supergroup")
+    division = clean_field(fields[2], "division")
+
+    # fields[3] is Subdivision and is intentionally omitted.
+    class_name = clean_field(fields[4], "class")
+    order_name = clean_field(fields[5], "order")
+    family_name = clean_field(fields[6], "family")
+    genus = clean_field(fields[7], "genus")
+    species = clean_field(fields[8], "species")
     
     rank_values = (
-        ("d", kingdom),
+        ("d", domain),
         ("k", supergroup),
         ("p", division),
         ("c", class_name),

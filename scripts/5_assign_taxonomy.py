@@ -76,7 +76,10 @@ def run_sintax(consensus_fasta, output_file, db_path, vsearch_path, threads, con
         "--db", str(db_path),
         "--tabbedout", str(output_file),
         "--sintax_cutoff", str(confidence),
-        "--threads", str(threads)
+        "--threads", str(threads),
+        "--strand", "both",
+        "--sintax_random",
+        "--randseed", "42",
     ]
     
     print(f"Running SINTAX taxonomy assignment...")

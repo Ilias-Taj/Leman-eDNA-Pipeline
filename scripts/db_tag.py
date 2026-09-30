@@ -27,3 +27,45 @@ def label_from_path(db_path: str) -> str:
     """Return short label for a known .udb file, or the stem as fallback."""
     stem = Path(db_path).stem.lower()
     return _DB_LABELS.get(stem, stem)
+
+DB_RANK_MAPS = {
+    "pr2": {
+        "d": "Domain",
+        "k": "Supergroup",
+        "p": "Division",
+        "c": "Class",
+        "o": "Order",
+        "f": "Family",
+        "g": "Genus",
+        "s": "Species",
+    },
+    "silva": {
+        "d": "Domain",
+        "k": "Kingdom",
+        "p": "Phylum",
+        "c": "Class",
+        "o": "Order",
+        "f": "Family",
+        "g": "Genus",
+        "s": "Species",
+    },
+    "midori2": {
+        "k": "Kingdom",
+        "p": "Phylum",
+        "c": "Class",
+        "o": "Order",
+        "f": "Family",
+        "g": "Genus",
+        "s": "Species",
+    },
+    "porter": {
+        "d": "Domain",
+        "k": "Kingdom",
+        "p": "Phylum",
+        "c": "Class",
+        "o": "Order",
+        "f": "Family",
+        "g": "Genus",
+        "s": "Species",
+    },
+}
