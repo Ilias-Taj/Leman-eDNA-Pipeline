@@ -13,11 +13,54 @@ from matplotlib import cm
 from IPython.display import display
 from matplotlib.gridspec import GridSpec
 
+try:
+    from db_tag import DB_RANK_MAPS
+except ImportError:
+    from .db_tag import DB_RANK_MAPS
+
 # ─── Global Configuration ────────────────────────────────────────────────────
 
-CONF_THRESHOLD = 0.8
-RANKS = ['Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
+# SINTAX rank codes and database prefix mappings
 
+SINTAX_CODES = ["d", "k", "p", "c", "o", "f", "g", "s"]
+
+PREFIX_TO_DB = {
+    "pr2": "pr2",
+    "silva": "silva",
+    "midori2": "midori2",
+    "midori": "midori2",
+    "porter": "porter",
+    "ekoi": "ekoi",
+}
+
+
+def get_db_label(prefix):
+    key = prefix.lower()
+
+    if key not in PREFIX_TO_DB:
+        raise ValueError(f"Unknown taxonomy prefix: {prefix}")
+
+    return PREFIX_TO_DB[key]
+
+def get_rank_map(prefix):
+    return DB_RANK_MAPS[get_db_label(prefix)]
+
+
+def get_tax_ranks(df, prefix):
+    ranks = list(dict.fromkeys(get_rank_map(prefix).values()))
+
+    return [
+        rank
+        for rank in ranks
+        if f"{prefix}_{rank}" in df.columns
+    ]
+
+
+def get_rank_for_code(prefix, code):
+    return get_rank_map(prefix).get(code)
+
+
+CONF_THRESHOLD = 0.8
 _CONF_NOTES = {
     'filtered': f'SINTAX confidence >= {CONF_THRESHOLD:.2f} applied - lower-confidence calls treated as Unassigned.',
     'unfiltered': 'No confidence filter applied - includes low-confidence assignments. Interpret taxa cautiously.',
@@ -49,17 +92,21 @@ def clean_sample_names(columns):
 
 
 def get_tax_prefix(df):
-    """Auto-detect taxonomy column prefix (PR2, Porter, MIDORI2, SILVA, eKOI)."""
+    """Auto-detect taxonomy column prefix."""
     for col in df.columns:
-        for pfx in ['PR2', 'Porter', 'MIDORI2', 'MIDORI', 'SILVA', 'eKOI']:
+        for pfx in ['pr2', 'porter', 'midori2', 'midori', 'silva', 'ekoi']:
             if col.startswith(f"{pfx}_"):
                 return pfx
-    return "PR2"
+
+    raise ValueError("Could not detect taxonomy database prefix")
 
 
 def get_sample_cols(df):
-    """Get sample columns (barcode read counts)."""
-    return [c for c in df.columns if c.startswith('Sample_') and 'unclassified' not in c]
+    return [
+        c for c in df.columns
+        if c.startswith('sample_')
+        and 'unclassified' not in c
+    ]
 
 
 def add_conf_note(fig=None, kind='filtered'):
@@ -73,8 +120,16 @@ def add_conf_note(fig=None, kind='filtered'):
 
 def clean_taxonomy_names(df, prefix):
     """Remove rank prefixes and trailing numeric suffixes from taxonomy columns."""
-    rank_re = re.compile(r'^(kingdom|phylum|class|order|family|genus|species)_', re.IGNORECASE)
-    tax_cols = [f'{prefix}_{r}' for r in RANKS]
+    
+    rank_re = re.compile(
+        r'^(domain|kingdom|supergroup|division|phylum|class|order|family|genus|species)_',
+        re.IGNORECASE
+    )
+    tax_cols = [
+        f"{prefix}_{rank}"
+        for rank in get_tax_ranks(df, prefix)
+    ]
+    
     for col in tax_cols:
         if col in df.columns:
             df[col] = df[col].apply(
@@ -89,19 +144,16 @@ def clean_taxonomy_names(df, prefix):
 # ─── Data Loading ────────────────────────────────────────────────────────────
 
 def load_marker_data(base_path, marker, db):
-    """Load comprehensive taxonomy CSV for a marker/db combo.
-    
-    Args:
-        base_path: Path to dataset output dir (e.g., out/Water_eDNA_18S_COI_14_01_26)
-        marker: '18S', 'COI', or 'JEDI'
-        db: 'pr2', 'silva', 'porter', 'midori2', or 'ekoi'
-    
-    Returns:
-        DataFrame or None if file doesn't exist
-    """
-    csv_path = Path(base_path) / f'taxonomy_summary/{marker}/{db}/comprehensive_taxonomy_{marker}.csv'
+    csv_path = (
+        Path(base_path)
+        / f'taxonomy_summary/{marker}/{db}/comprehensive_taxonomy_{marker}.csv'
+    )
+
     if csv_path.exists():
-        return pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path)
+        df.columns = df.columns.str.lower()
+        return df
+
     return None
 
 
@@ -120,19 +172,25 @@ def print_data_summary(df, label, prefix):
 
 # ─── QC Plots ────────────────────────────────────────────────────────────────
 
-def confidence_dashboard(datasets, conf_threshold=None):
+def confidence_dashboard(datasets, conf_threshold=CONF_THRESHOLD):
     """SINTAX confidence distribution dashboard.
     
     Args:
         datasets: list of (df, prefix, label) tuples, e.g. [(df_18s, 'PR2', '18S (PR2)')]
         conf_threshold: override global threshold
     """
-    if conf_threshold is None:
-        conf_threshold = CONF_THRESHOLD
     
     n_markers = len(datasets)
     fig = plt.figure(figsize=(22, 5 * (1 + n_markers)))
-    gs = GridSpec(1 + n_markers, 6, figure=fig, hspace=0.45, wspace=0.35)
+    max_ranks = max(
+        len(get_tax_ranks(df, prefix))
+        for df, prefix, _ in datasets
+    )
+    print([
+        (prefix, get_tax_ranks(df, prefix))
+        for df, prefix, _ in datasets
+    ])
+    gs = GridSpec(1 + n_markers, max_ranks, figure=fig, hspace=0.45, wspace=0.35)
     fig.suptitle('SINTAX Confidence Distribution Dashboard', fontsize=18, fontweight='bold')
 
     # Row 0: Mean confidence per rank (bar charts)
@@ -140,8 +198,11 @@ def confidence_dashboard(datasets, conf_threshold=None):
     for col_start, (df, prefix, label) in enumerate(datasets):
         ax = fig.add_subplot(gs[0, col_start*cols_per:(col_start+1)*cols_per])
         means, counts = [], []
-        for r in RANKS:
-            col = f'{prefix}_{r}_Conf'
+        
+        ranks = get_tax_ranks(df, prefix)
+
+        for r in ranks:
+            col = f'{prefix}_{r}_conf'
             if col in df.columns:
                 vals = pd.to_numeric(df[col], errors='coerce').dropna()
                 means.append(vals.mean() if len(vals) > 0 else 0)
@@ -149,7 +210,7 @@ def confidence_dashboard(datasets, conf_threshold=None):
             else:
                 means.append(0); counts.append(0)
         colors = ['#2ecc71' if m >= conf_threshold else '#e74c3c' for m in means]
-        bars = ax.bar(RANKS, means, color=colors, edgecolor='white')
+        bars = ax.bar(ranks, means, color=colors, edgecolor='white')
         ax.axhline(y=conf_threshold, color='red', linestyle='--', alpha=0.7,
                    label=f'Threshold ({conf_threshold:.2f})')
         ax.set_ylim(0, 1.05)
@@ -164,9 +225,9 @@ def confidence_dashboard(datasets, conf_threshold=None):
 
     # Subsequent rows: histograms per marker
     for row_idx, (df, prefix, label) in enumerate(datasets):
-        for rank_idx, rank in enumerate(RANKS):
+        for rank_idx, rank in enumerate(get_tax_ranks(df, prefix)):
             ax = fig.add_subplot(gs[1 + row_idx, rank_idx])
-            col = f'{prefix}_{rank}_Conf'
+            col = f'{prefix}_{rank}_conf'
             if col in df.columns:
                 vals = pd.to_numeric(df[col], errors='coerce').dropna()
                 if len(vals) > 0:
@@ -197,10 +258,12 @@ def db_performance_dashboard(datasets, conf_threshold=None):
                  'pct_reads_any': [], 'pct_reads_conf': []}
         total_otus = len(df)
         sample_cols = get_sample_cols(df)
-        total_reads = df['Total_Abundance'].sum() if 'Total_Abundance' in df.columns else df[sample_cols].sum().sum()
-        for rank in RANKS:
+        total_reads = df['total_abundance'].sum() if 'total_abundance' in df.columns else df[sample_cols].sum().sum()
+        ranks = get_tax_ranks(df, prefix)
+
+        for rank in ranks:
             col = f'{prefix}_{rank}'
-            conf_col = f'{prefix}_{rank}_Conf'
+            conf_col = f'{prefix}_{rank}_conf'
             if col not in df.columns:
                 stats['rank'].append(rank)
                 for k in ['pct_any', 'pct_conf', 'pct_reads_any', 'pct_reads_conf']:
@@ -210,7 +273,7 @@ def db_performance_dashboard(datasets, conf_threshold=None):
             has_conf = has_any.copy()
             if conf_col in df.columns:
                 has_conf = has_any & (pd.to_numeric(df[conf_col], errors='coerce').fillna(0) >= conf_threshold)
-            reads_col = 'Total_Abundance' if 'Total_Abundance' in df.columns else None
+            reads_col = 'total_abundance' if 'total_abundance' in df.columns else None
             if reads_col and reads_col in df.columns:
                 reads_any = df.loc[has_any, reads_col].sum()
                 reads_conf = df.loc[has_conf, reads_col].sum()
@@ -234,10 +297,11 @@ def db_performance_dashboard(datasets, conf_threshold=None):
         st = db_stats(df, prefix)
         # Panel 1: OTU assignment rate
         ax = axes[i][0] if n > 1 else axes[0]
-        x = np.arange(len(RANKS))
+        ranks = get_tax_ranks(df, prefix)
+        x = np.arange(len(ranks))
         ax.bar(x - 0.2, st['pct_any'], 0.4, label='Any assignment', color='#3498db', alpha=0.8)
         ax.bar(x + 0.2, st['pct_conf'], 0.4, label=f'Confident (>={conf_threshold})', color='#2ecc71', alpha=0.8)
-        ax.set_xticks(x); ax.set_xticklabels(RANKS, rotation=45)
+        ax.set_xticks(x); ax.set_xticklabels(ranks, rotation=45)
         ax.set_ylabel('% of OTUs'); ax.set_ylim(0, 105)
         ax.set_title(f'{label}: OTU Assignment Rate', fontweight='bold')
         ax.legend(fontsize=8)
@@ -245,14 +309,14 @@ def db_performance_dashboard(datasets, conf_threshold=None):
         ax = axes[i][1] if n > 1 else axes[1]
         ax.bar(x - 0.2, st['pct_reads_any'], 0.4, label='Any assignment', color='#9b59b6', alpha=0.8)
         ax.bar(x + 0.2, st['pct_reads_conf'], 0.4, label=f'Confident (>={conf_threshold})', color='#e67e22', alpha=0.8)
-        ax.set_xticks(x); ax.set_xticklabels(RANKS, rotation=45)
+        ax.set_xticks(x); ax.set_xticklabels(ranks, rotation=45)
         ax.set_ylabel('% of Reads'); ax.set_ylim(0, 105)
         ax.set_title(f'{label}: Read-Weighted Coverage', fontweight='bold')
         ax.legend(fontsize=8)
         # Panel 3: Resolution depth
         ax = axes[i][2] if n > 1 else axes[2]
-        ax.plot(RANKS, st['pct_conf'], 'o-', color='#e74c3c', linewidth=2, markersize=8)
-        ax.fill_between(RANKS, st['pct_conf'], alpha=0.2, color='#e74c3c')
+        ax.plot(ranks, st['pct_conf'], 'o-', color='#e74c3c', linewidth=2, markersize=8)
+        ax.fill_between(ranks, st['pct_conf'], alpha=0.2, color='#e74c3c')
         ax.set_ylabel('% Confidently Resolved'); ax.set_ylim(0, 105)
         ax.set_title(f'{label}: Resolution Depth', fontweight='bold')
         ax.tick_params(axis='x', rotation=45)
@@ -507,7 +571,7 @@ def plot_barcode_reads(base_path, markers, marker_colors=None):
 # ─── Biodiversity Plots ─────────────────────────────────────────────────────
 
 def stacked_bar_compare(df, rank, prefix, marker_label, sample_cols=None,
-                        top_n=10, conf_threshold=None):
+                        top_n=10, conf_threshold=CONF_THRESHOLD):
     """Dual stacked bar: left with Unassigned, right without (renormalized).
     
     Args:
@@ -519,14 +583,16 @@ def stacked_bar_compare(df, rank, prefix, marker_label, sample_cols=None,
         top_n: Number of top taxa to show
         conf_threshold: Confidence threshold (default: CONF_THRESHOLD)
     """
-    if conf_threshold is None:
-        conf_threshold = CONF_THRESHOLD
     if sample_cols is None:
         sample_cols = get_sample_cols(df)
     
     col = f'{prefix}_{rank}'
-    conf_col = f'{prefix}_{rank}_Conf'
+    conf_col = f'{prefix}_{rank}_conf'
     d = df.copy()
+    # use lowered column names for comparison
+    d.columns = [c.lower() for c in d.columns]
+    col = col.lower()
+    conf_col = conf_col.lower()
     if conf_col in d.columns:
         d.loc[pd.to_numeric(d[conf_col], errors='coerce').fillna(0) < conf_threshold, col] = ''
     d[col] = d[col].replace('', 'Unassigned').fillna('Unassigned')
@@ -595,8 +661,8 @@ def plot_top_genera_confident(df, prefix, marker_label, sample_cols=None,
     if sample_cols is None:
         sample_cols = get_sample_cols(df)
     
-    genus_col = f'{prefix}_Genus'
-    conf_col = f'{prefix}_Genus_Conf'
+    genus_col = f'{prefix}_genus'
+    conf_col = f'{prefix}_genus_conf'
     d = df.copy()
     d[genus_col] = d[genus_col].fillna('Unassigned')
 
@@ -643,8 +709,8 @@ def plot_top_genera_all(df, prefix, marker_label, sample_cols=None,
     if sample_cols is None:
         sample_cols = get_sample_cols(df)
     
-    genus_col = f'{prefix}_Genus'
-    conf_col = f'{prefix}_Genus_Conf'
+    genus_col = f'{prefix}_genus'
+    conf_col = f'{prefix}_genus_conf'
     d = df.copy()
     d[genus_col] = d[genus_col].fillna('Unassigned')
 
@@ -699,9 +765,9 @@ def plot_eukaryotic_genera(df, prefix, marker_label, sample_cols=None,
         sample_cols = get_sample_cols(df)
     
     _df = df.copy()
-    genus_col = f'{prefix}_Genus'
-    conf_col = f'{prefix}_Genus_Conf'
-    domain_col = f'{prefix}_Domain'
+    genus_col = f'{prefix}_genus'
+    conf_col = f'{prefix}_genus_conf'
+    domain_col = f'{prefix}_domain'
 
     if domain_col in _df.columns:
         euk_mask = _df[domain_col].astype(str).str.contains('Eukaryota', case=False, na=False)
@@ -843,12 +909,14 @@ def blast_vs_sintax_table(blast_file, df_taxonomy, prefix, marker_label):
     rows = []
     for _, br in blast_tbl.iterrows():
         otu = br['OTU']
-        tr = df_taxonomy[df_taxonomy['OTU_ID'] == otu]
+        tr = df_taxonomy[df_taxonomy['otu_id'] == otu]
         row = {'OTU': otu, 'Abundance': br['Abundance'],
                'BLAST Top Hit': br['Species'], 'Identity (%)': br['Identity']}
-        for rank in RANKS:
+        ranks = get_tax_ranks(df_taxonomy, prefix)
+
+        for rank in ranks:
             nm_col = f'{prefix}_{rank}'
-            cf_col = f'{prefix}_{rank}_Conf'
+            cf_col = f'{prefix}_{rank}_conf'
             if not tr.empty and nm_col in tr.columns:
                 nm = tr[nm_col].values[0]
                 cf = tr[cf_col].values[0] if cf_col in tr.columns else None
@@ -902,8 +970,8 @@ def cross_marker_genus_comparison(datasets, conf_threshold=None):
     
     genera_sets = {}
     for df, prefix, label in datasets:
-        genus_col = f'{prefix}_Genus'
-        conf_col = f'{prefix}_Genus_Conf'
+        genus_col = f'{prefix}_genus'
+        conf_col = f'{prefix}_genus_conf'
         d = df.copy()
         if conf_col in d.columns:
             mask = pd.to_numeric(d[conf_col], errors='coerce').fillna(0) >= conf_threshold
@@ -926,31 +994,48 @@ def cross_marker_genus_comparison(datasets, conf_threshold=None):
 
 # ─── Comparative (Multi-DB) Plots ───────────────────────────────────────────
 
-def compare_db_assignment_rates(db_datasets, marker_label, conf_threshold=None):
+def compare_db_assignment_rates(db_datasets, marker_label, conf_threshold=CONF_THRESHOLD):
     """Compare assignment rates across multiple databases for the same marker.
     
     Args:
         db_datasets: list of (df, prefix, db_label) tuples for same marker
         marker_label: e.g., '18S', 'COI', 'JEDI'
+        conf_threshold: confidence threshold for considering an assignment (default: CONF_THRESHOLD)
     """
-    if conf_threshold is None:
-        conf_threshold = CONF_THRESHOLD
     
     db_colors = {'eKOI': '#4CAF50', 'SILVA': '#2196F3', 'PR2': '#9C27B0',
                  'Porter': '#FF9800', 'MIDORI2': '#F44336'}
     
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
-    x = np.arange(len(RANKS))
+    rank_codes = ['d', 'k', 'p', 'c', 'o', 'f', 'g', 's']
+    rank_labels = [
+        'Domain',
+        'Kingdom/Supergroup',
+        'Phylum/Division',
+        'Class',
+        'Order',
+        'Family',
+        'Genus',
+        'Species',
+    ]
+
+    x = np.arange(len(rank_codes))
     width = 0.8 / len(db_datasets)
     
     for i, (df, prefix, db_label) in enumerate(db_datasets):
         sample_cols = get_sample_cols(df)
         total_otus = len(df)
         pct_conf = []
-        for rank in RANKS:
+        for code in rank_codes:
+            rank = get_rank_for_code(prefix, code)
+
+            if rank is None:
+                pct_conf.append(0)
+                continue
+            
             col = f'{prefix}_{rank}'
-            conf_col = f'{prefix}_{rank}_Conf'
+            conf_col = f'{prefix}_{rank}_conf'
             if col not in df.columns:
                 pct_conf.append(0)
                 continue
@@ -964,7 +1049,7 @@ def compare_db_assignment_rates(db_datasets, marker_label, conf_threshold=None):
         offset = (i - len(db_datasets)/2 + 0.5) * width
         axes[0].bar(x + offset, pct_conf, width, label=db_label, color=color, alpha=0.85)
     
-    axes[0].set_xticks(x); axes[0].set_xticklabels(RANKS, rotation=45)
+    axes[0].set_xticks(x); axes[0].set_xticklabels(rank_labels, rotation=45)
     axes[0].set_ylabel('% OTUs Confidently Assigned')
     axes[0].set_title(f'{marker_label}: Confident Assignment Rate by Database', fontweight='bold')
     axes[0].legend(); axes[0].set_ylim(0, 105)
@@ -972,8 +1057,8 @@ def compare_db_assignment_rates(db_datasets, marker_label, conf_threshold=None):
     # Panel 2: Species-level comparison
     species_data = []
     for df, prefix, db_label in db_datasets:
-        col = f'{prefix}_Species'
-        conf_col = f'{prefix}_Species_Conf'
+        col = f'{prefix}_species'
+        conf_col = f'{prefix}_species_conf'
         if col in df.columns:
             has = df[col].notna() & (df[col] != '')
             conf = has & (pd.to_numeric(df[conf_col], errors='coerce').fillna(0) >= conf_threshold) if conf_col in df.columns else has
@@ -1011,8 +1096,8 @@ def compare_db_phylum_composition(db_datasets, marker_label, sample_cols=None,
     for i, (df, prefix, db_label) in enumerate(db_datasets):
         ax = axes[i]
         s_cols = sample_cols if sample_cols else get_sample_cols(df)
-        col = f'{prefix}_Phylum'
-        conf_col = f'{prefix}_Phylum_Conf'
+        col = f'{prefix}_phylum'
+        conf_col = f'{prefix}_phylum_conf'
         d = df.copy()
         if conf_col in d.columns:
             d.loc[pd.to_numeric(d[conf_col], errors='coerce').fillna(0) < conf_threshold, col] = 'Unassigned'
@@ -1038,3 +1123,16 @@ def compare_db_phylum_composition(db_datasets, marker_label, sample_cols=None,
     fig.suptitle(f'{marker_label}: Phylum Composition by Database (read abundance)', fontsize=14, fontweight='bold')
     plt.tight_layout()
     plt.show()
+
+def latest_run(dataset_name, out_dir="out"):
+    matches = sorted(
+        p for p in Path(out_dir).glob(f"{dataset_name}_????????_??????")
+        if p.is_dir()
+    )
+
+    if not matches:
+        raise FileNotFoundError(
+            f"No runs found for {dataset_name}"
+        )
+
+    return matches[-1]

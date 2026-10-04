@@ -91,6 +91,9 @@ get_memory_usage() {
   fi
 }
 
+# Keep the exact command used before argument parsing consumes $@
+ORIGINAL_COMMAND="$0 $*"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --root) ROOT_DIR="$2"; shift 2;;
@@ -116,13 +119,22 @@ done
 mkdir -p out/logs
 
 # Derive run name from the data directory name
-RUN_NAME=$(basename "$(dirname "$ROOT_DIR")")
+INPUT_NAME=$(basename "$(dirname "$ROOT_DIR")")
+RUN_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+RUN_STARTED_AT=$(date -Iseconds)
+
+RUN_NAME="${INPUT_NAME}_${RUN_TIMESTAMP}"
 OUTPUT_ROOT="out/$RUN_NAME"
 
-# Create main pipeline log and progress files
-PIPELINE_LOG="out/logs/pipeline_$(date +%Y%m%d_%H%M%S).log"
-PROGRESS_FILE="out/logs/pipeline_progress.txt"
-mkdir -p "$(dirname "$PIPELINE_LOG")"
+# Create run directories
+mkdir -p "$OUTPUT_ROOT/logs"
+
+# Run-specific logs
+PIPELINE_LOG="$OUTPUT_ROOT/logs/pipeline.log"
+PROGRESS_FILE="$OUTPUT_ROOT/logs/progress.log"
+
+# Metadata file will be created at the end of the run
+METADATA_FILE="$OUTPUT_ROOT/run_metadata.json"
 
 # Function to log and display messages
 log_message() {
@@ -253,7 +265,7 @@ for sample in "${samples[@]}"; do
   echo "Running preprocessing (quality filter only) ..." | tee -a "$logf"
   log_message "Running preprocessing for $sample (${raw_reads_mb}MB)..."
   export PATH="$ENV_PREFIX/bin:/opt/homebrew/bin:$PATH"
-  if ! "$ENV_PREFIX/bin/python3" scripts/1_run_preprocessing.py --input_files "$sample_dir"/*.fastq.gz --output_dir "$outdir" --min_mean_q "$MIN_MEAN_Q" >> "$logf" 2>&1; then
+  if ! "$ENV_PREFIX/bin/python3" scripts/1_run_preprocessing.py --input_files "$sample_dir"/*.fastq.gz --output_dir "$outdir" --min_mean_q "$MIN_MEAN_Q" --min_length "$MIN_LENGTH" --keep_percent "$KEEP_PERCENT" >> "$logf" 2>&1; then
     echo "Preprocessing failed for $sample (see $logf). Continuing to next sample." | tee -a "$logf"
     log_message "[FAIL] Preprocessing FAILED for $sample"
     update_progress "[PREPROC] FAILED $sample"
@@ -444,20 +456,34 @@ resolve_coi_db() {
 
 # Build database arguments dynamically based on active markers
 TAXONOMY_DB_ARGS=""
+
+RESOLVED_DB_18S=""
+RESOLVED_DB_COI=""
+RESOLVED_DB_JEDI=""
+
 IFS=',' read -ra MARKER_ARRAY <<< "$MARKERS"
+
 for m in "${MARKER_ARRAY[@]}"; do
   case "$m" in
     18S)
-      _db=$(resolve_18s_db "$DB_18S")
-      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S $_db"
+      RESOLVED_DB_18S=$(resolve_18s_db "$DB_18S")
+      if [ -n "$RESOLVED_DB_18S" ] && [ -f "$RESOLVED_DB_18S" ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_18S $RESOLVED_DB_18S"
+      fi
       ;;
+
     COI)
-      _db=$(resolve_coi_db "$DB_COI")
-      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI $_db"
+      RESOLVED_DB_COI=$(resolve_coi_db "$DB_COI")
+      if [ -n "$RESOLVED_DB_COI" ] && [ -f "$RESOLVED_DB_COI" ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_COI $RESOLVED_DB_COI"
+      fi
       ;;
+
     JEDI)
-      _db=$(resolve_18s_db "$DB_JEDI")
-      [ -n "$_db" ] && [ -f "$_db" ] && TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI $_db"
+      RESOLVED_DB_JEDI=$(resolve_18s_db "$DB_JEDI")
+      if [ -n "$RESOLVED_DB_JEDI" ] && [ -f "$RESOLVED_DB_JEDI" ]; then
+        TAXONOMY_DB_ARGS="$TAXONOMY_DB_ARGS --db_JEDI $RESOLVED_DB_JEDI"
+      fi
       ;;
   esac
 done
@@ -664,6 +690,202 @@ if [ ${#barcode_names[@]} -gt 0 ]; then
   echo "Summary CSV:           $OUTPUT_ROOT/taxonomy_summary/"
   echo "Logs:                  $OUTPUT_ROOT/logs/"
 fi
+
+# ---------------------------------------------------------------------------
+# Write final run metadata
+# ---------------------------------------------------------------------------
+
+export ROOT_DIR INPUT_NAME RUN_TIMESTAMP RUN_STARTED_AT
+export RUN_NAME OUTPUT_ROOT METADATA_FILE ORIGINAL_COMMAND
+
+export MARKERS THREADS MIN_MEAN_Q MIN_LENGTH KEEP_PERCENT
+export SKIP_TRIMMING SKIP_BLAST ISONCLUST3_PATH ENV_PREFIX
+
+export DB_18S DB_COI DB_JEDI
+export RESOLVED_DB_18S RESOLVED_DB_COI RESOLVED_DB_JEDI
+
+export CPU_CORES TOTAL_MEM_GB SYSTEM_INFO
+
+export total_time marker_time trim_time cluster_time
+export matrix_time taxonomy_time summary_time blast_time
+
+"$ENV_PREFIX/bin/python3" - "$METADATA_FILE" "${samples[@]}" <<'PY'
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+metadata_file = sys.argv[1]
+samples = sys.argv[2:]
+
+
+def env_int(name, default=None):
+    value = os.environ.get(name)
+    if value in (None, ""):
+        return default
+    return int(value)
+
+
+def env_float(name, default=None):
+    value = os.environ.get(name)
+    if value in (None, ""):
+        return default
+    return float(value)
+
+
+def env_bool(name):
+    return os.environ.get(name, "").lower() == "true"
+
+
+def db_label(path):
+    if not path:
+        return None
+
+    stem = Path(path).stem.lower()
+
+    labels = {
+        "pr2_18s": "pr2",
+        "silva_18s": "silva",
+        "midori2_coi": "midori2",
+        "ekoi_coi": "ekoi",
+        "porter_coi": "porter",
+    }
+
+    return labels.get(stem, stem)
+
+
+def git_command(*args):
+    try:
+        return subprocess.check_output(
+            ["git", *args],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return None
+
+
+markers = [
+    marker.strip()
+    for marker in os.environ.get("MARKERS", "").split(",")
+    if marker.strip()
+]
+
+
+def database_metadata(marker, requested_var, resolved_var):
+    if marker not in markers:
+        return None
+
+    requested = os.environ.get(requested_var) or None
+    resolved = os.environ.get(resolved_var) or None
+
+    return {
+        "requested": requested,
+        "selection_mode": "explicit" if requested else "auto",
+        "resolved_path": resolved,
+        "label": db_label(resolved),
+    }
+
+
+git_commit = git_command("rev-parse", "HEAD")
+git_branch = git_command("rev-parse", "--abbrev-ref", "HEAD")
+
+try:
+    git_dirty = bool(
+        subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    )
+except Exception:
+    git_dirty = None
+
+
+metadata = {
+    "run": {
+        "name": os.environ["RUN_NAME"],
+        "timestamp": os.environ["RUN_TIMESTAMP"],
+        "started_at": os.environ["RUN_STARTED_AT"],
+        "finished_at": datetime.now().astimezone().isoformat(),
+        "status": "completed",
+        "duration_seconds": env_int("total_time"),
+        "output_directory": os.environ["OUTPUT_ROOT"],
+    },
+
+    "input": {
+        "root": os.environ["ROOT_DIR"],
+        "dataset_name": os.environ["INPUT_NAME"],
+    },
+
+    "samples": samples,
+
+    "parameters": {
+        "markers": markers,
+        "threads": env_int("THREADS"),
+        "min_mean_q": env_int("MIN_MEAN_Q"),
+        "min_length": env_int("MIN_LENGTH"),
+        "keep_percent": env_float("KEEP_PERCENT"),
+        "skip_trimming": env_bool("SKIP_TRIMMING"),
+        "skip_blast": env_bool("SKIP_BLAST"),
+        "isonclust3_path": os.environ.get("ISONCLUST3_PATH"),
+        "environment_prefix": os.environ.get("ENV_PREFIX"),
+    },
+
+    "databases": {
+        "18S": database_metadata(
+            "18S", "DB_18S", "RESOLVED_DB_18S"
+        ),
+        "COI": database_metadata(
+            "COI", "DB_COI", "RESOLVED_DB_COI"
+        ),
+        "JEDI": database_metadata(
+            "JEDI", "DB_JEDI", "RESOLVED_DB_JEDI"
+        ),
+    },
+
+    "processing": {
+        "quality_filter": "filtlong",
+        "marker_classification": "minimap2_with_length_fallback",
+        "primer_trimming": "cutadapt",
+        "clustering": "isONclust3",
+        "consensus": "SPOA",
+        "chimera_detection": "vsearch_uchime_denovo",
+        "taxonomy_assignment": "vsearch_sintax",
+    },
+
+    "timings": {
+        "marker_classification_seconds": env_int("marker_time", 0),
+        "primer_trimming_seconds": env_int("trim_time", 0),
+        "clustering_seconds": env_int("cluster_time", 0),
+        "abundance_matrices_seconds": env_int("matrix_time", 0),
+        "taxonomy_seconds": env_int("taxonomy_time", 0),
+        "summary_seconds": env_int("summary_time", 0),
+        "blast_seconds": env_int("blast_time", 0),
+        "total_seconds": env_int("total_time", 0),
+    },
+
+    "system": {
+        "cpu_cores": env_int("CPU_CORES"),
+        "memory_gb": env_int("TOTAL_MEM_GB"),
+        "system": os.environ.get("SYSTEM_INFO"),
+    },
+
+    "code": {
+        "command": os.environ.get("ORIGINAL_COMMAND"),
+        "git_commit": git_commit,
+        "git_branch": git_branch,
+        "git_dirty": git_dirty,
+    },
+}
+
+with open(metadata_file, "w") as f:
+    json.dump(metadata, f, indent=2)
+
+print(f"Run metadata written to: {metadata_file}")
+PY
 
 echo ""
 echo "============================================================"
