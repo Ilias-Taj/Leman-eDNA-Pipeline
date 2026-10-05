@@ -118,11 +118,20 @@ done
 
 mkdir -p out/logs
 
-# Derive run name from the data directory name
-INPUT_NAME=$(basename "$(dirname "$ROOT_DIR")")
-RUN_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RUN_STARTED_AT=$(date -Iseconds)
 
+# Derive run name from the data directory name
+# Remove trailing slash first
+ROOT_DIR="${ROOT_DIR%/}"
+
+# Derive dataset name
+if [[ "$(basename "$ROOT_DIR")" == "fastq_pass" ]]; then
+    INPUT_NAME=$(basename "$(dirname "$ROOT_DIR")")
+else
+    INPUT_NAME=$(basename "$ROOT_DIR")
+fi
+
+RUN_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RUN_NAME="${INPUT_NAME}_${RUN_TIMESTAMP}"
 OUTPUT_ROOT="out/$RUN_NAME"
 

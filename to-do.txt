@@ -4,3 +4,4 @@
 - Control Dataset to check pipeline results integrity
 - Web app for biodiversity map
 - Server to host and run 
+- Use clean consensus fasta in the pipeline.

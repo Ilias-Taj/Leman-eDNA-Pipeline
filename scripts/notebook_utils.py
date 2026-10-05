@@ -433,7 +433,7 @@ def plot_reads_per_otu(base_path, markers, marker_colors=None):
     if len(markers) == 1:
         axes = [axes]
     for ax, marker in zip(axes, markers):
-        fasta = base / f"temp_clustering/consensus_{marker}.fasta"
+        fasta = base / f"temp_clustering/consensus_{marker}_clean.fasta"
         sizes = parse_cluster_sizes(str(fasta))
         if not sizes:
             ax.text(0.5, 0.5, f'No consensus FASTA found:\n{fasta}',
@@ -473,7 +473,7 @@ def plot_reads_per_otu(base_path, markers, marker_colors=None):
           f"{'% spoa':>8} {'Median reads':>14} {'Max reads':>10}")
     print("-" * 80)
     for marker in markers:
-        fasta = base / f"temp_clustering/consensus_{marker}.fasta"
+        fasta = base / f"temp_clustering/consensus_{marker}_clean.fasta"
         sizes = parse_cluster_sizes(str(fasta))
         if sizes:
             vals = list(sizes.values())
